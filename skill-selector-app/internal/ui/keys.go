@@ -16,12 +16,12 @@ type keyMap struct {
 
 func defaultKeyMap() keyMap {
 	return keyMap{
-		// Up and down are matched before the search bars see a key, so j and
-		// k navigate in every panel and cannot be typed into a search. Other
-		// letters and space still type into the focused search bar, which is
-		// why toggle is enter rather than space.
-		Up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
-		Down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
+		// Up and down are matched before the search bars see a key, so they
+		// are bound to the arrow keys only. Letters and space fall through to
+		// the focused search bar, which is why toggle is enter rather than
+		// space and why j and k are not navigation keys.
+		Up:     key.NewBinding(key.WithKeys("up"), key.WithHelp("↑", "up")),
+		Down:   key.NewBinding(key.WithKeys("down"), key.WithHelp("↓", "down")),
 		Toggle: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "toggle")),
 		// ctrl+enter is not distinguishable from enter in a terminal (both
 		// send a carriage return), so toggle all uses ctrl+a. It is matched

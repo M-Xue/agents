@@ -201,7 +201,7 @@ func footer(m *Model) string {
 
 func TestHelpFollowsFocus(t *testing.T) {
 	m, _ := newModel(t)
-	common := []string{"↑/k up", "↓/j down", "next panel", "prev panel", "esc quit"}
+	common := []string{"↑ up", "↓ down", "next panel", "prev panel", "esc quit"}
 	for _, p := range []panelID{panelLibraries, panelSkills, panelDetails} {
 		m.setFocus(p)
 		f := footer(m)
@@ -221,34 +221,23 @@ func TestHelpFollowsFocus(t *testing.T) {
 	}
 }
 
-func TestVimKeysAndEsc(t *testing.T) {
+func TestLettersTypeIntoSearchAndEsc(t *testing.T) {
 	m, _ := newModel(t)
 	typed := func(r rune) { m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}) }
 
-	typed('j') // libraries: alpha -> beta
-	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") {
-		t.Fatal("j did not move the library cursor")
-	}
-	typed('k') // back to alpha
-	if v := view(m); !strings.Contains(v, "APPLE SKILL BODY") {
-		t.Fatal("k did not move the library cursor")
-	}
-	if m.libSearch.Value() != "" {
-		t.Fatalf("j/k leaked into the search: %q", m.libSearch.Value())
-	}
-
-	press(m, tea.KeyTab) // skills
-	typed('j')
-	if v := view(m); !strings.Contains(v, "BANANA SKILL BODY") {
-		t.Fatal("j did not move the skill cursor")
-	}
-
-	press(m, tea.KeyTab) // details
-	before := m.details.Offset()
+	// j and k are not navigation keys: they must reach the focused search
+	// bar rather than move the cursor. "jk" matches no library, so the
+	// filtered list empties and no skill body is shown at all.
 	typed('j')
 	typed('k')
-	if m.details.Offset() != before {
-		t.Fatal("j then k did not return the details scroll to its start")
+	if got := m.libSearch.Value(); got != "jk" {
+		t.Fatalf("library search = %q, want %q", got, "jk")
+	}
+	if v := view(m); strings.Contains(v, "CHERRY SKILL BODY") {
+		t.Fatal("j moved the library cursor to beta")
+	}
+	if v := view(m); strings.Contains(v, "alpha") || strings.Contains(v, "beta") {
+		t.Fatalf("typing jk did not filter the library list: %q", v)
 	}
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
