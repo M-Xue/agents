@@ -186,11 +186,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 	case tea.MouseMsg:
-		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
-			if id, ok := m.panelAt(msg.X, msg.Y); ok {
-				m.setFocus(id)
-			}
-		}
+		m.updateMouse(msg)
 		return m, nil
 	case tea.KeyMsg:
 		m.status = ""
@@ -210,6 +206,51 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// updateMouse routes mouse events by the panel under the pointer, not by
+// focus. A left click focuses that panel. The wheel scrolls the list or file
+// in that panel one row per notch without changing focus or moving the
+// cursor, so a user can read a long skill file or skim a long list while
+// still typing in a search elsewhere. Any other mouse event is ignored.
+func (m *Model) updateMouse(msg tea.MouseMsg) {
+	id, ok := m.panelAt(msg.X, msg.Y)
+	if !ok {
+		return
+	}
+	switch {
+	case msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft:
+		m.setFocus(id)
+	case msg.Button == tea.MouseButtonWheelUp:
+		m.scrollPanel(id, -1)
+	case msg.Button == tea.MouseButtonWheelDown:
+		m.scrollPanel(id, 1)
+	}
+}
+
+// scrollPanel scrolls the scrollable component in the given panel by one
+// row: up when dir is negative, down otherwise.
+func (m *Model) scrollPanel(id panelID, dir int) {
+	switch id {
+	case panelLibraries:
+		if dir < 0 {
+			m.libraries.ScrollUp()
+		} else {
+			m.libraries.ScrollDown()
+		}
+	case panelSkills:
+		if dir < 0 {
+			m.skills.ScrollUp()
+		} else {
+			m.skills.ScrollDown()
+		}
+	case panelDetails:
+		if dir < 0 {
+			m.details.ScrollUp()
+		} else {
+			m.details.ScrollDown()
+		}
+	}
 }
 
 // setFocus moves keyboard focus to the given panel and focuses or blurs the

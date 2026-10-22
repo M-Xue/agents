@@ -100,12 +100,17 @@ split into two subpackages so screens stay free of styling detail:
 - `ui/component/list` is a scrolling list of `Item{ID, Label}` rows with a
   bold cursor row. It owns the cursor and scroll offset, wraps at both ends,
   and keeps the cursor on the same ID across `SetItems` or snaps to the top.
+  `ScrollUp` and `ScrollDown` move the window without the cursor, stopping at
+  the ends; the next cursor move brings the cursor back into view. `SetSize`
+  only re-anchors the window on the cursor when the height actually changes,
+  so the per-render re-size does not undo a wheel scroll.
 - `ui/component/checklist` is a scrolling list of `Item{ID, Checked, Label}`
   rows. Unchecked rows show U+E640, checked rows U+F4A7 (both Nerd Font
   glyphs), the cursor row is bold. The component owns the cursor and scroll
   offset and wraps at both ends; checked state is passed in by the caller
   and never mutated by the component. `Items` hands back a copy of the rows
-  as last set so the caller can act on exactly what is shown.
+  as last set so the caller can act on exactly what is shown. Scrolling
+  without the cursor works as in `list`.
 
 - `ui/component/searchbar` is a single-line text field on a dark background
   with a block caret, ported from grove's text input. It owns the typed value
@@ -224,11 +229,14 @@ bottom: the app tab, a blank line, the panels, then a single reserved row for
 the help footer. The panels run right down to the footer with no gap. The three panels, Skill Libraries, Skills and Details, are
 split 1:1:2 with a single blank column between each. Tab and shift+tab move
 focus between them, and a left click inside a panel focuses it; the focused
-panel takes the active border colour. `panelGeometry` is the single source
-of the panel widths and height, used both to draw them and, in `panelAt`, to
-map a click to a panel, so the two cannot drift apart. Mouse reporting is
-enabled in `main` with `tea.WithMouseCellMotion`. Clicking is not listed in
-the help footer. The footer is rendered with
+panel takes the active border colour. The mouse wheel scrolls whichever
+panel is under the pointer, one row per notch, regardless of focus: the
+library and skill lists scroll their window without moving the cursor, and
+the details file scrolls by wrapped line. `panelGeometry` is the single
+source of the panel widths and height, used both to draw them and, in
+`panelAt`, to map a click or wheel event to a panel, so the two cannot drift
+apart. Mouse reporting is enabled in `main` with `tea.WithMouseCellMotion`.
+Mouse use is not listed in the help footer. The footer is rendered with
 `bubbles/help` in short mode from `keyMap.helpFor(focused)` in `keys.go`, so
 every panel lists up, down, next panel, previous panel and quit, and Skills
 alone appends toggle and toggle all at the end.

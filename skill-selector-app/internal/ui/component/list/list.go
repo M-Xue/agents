@@ -46,12 +46,37 @@ func (m *Model) SetItems(items []Item) {
 }
 
 // SetSize sets the visible area in cells. height is the number of rows shown
-// at once; the list scrolls within it.
+// at once; the list scrolls within it. A height change brings the cursor
+// back into view; an unchanged size only keeps the window within bounds, so
+// a wheel scroll survives the re-sizing every render performs.
 func (m *Model) SetSize(width, height int) {
+	changed := height != m.height
 	m.width = width
 	m.height = height
-	m.clamp()
+	if changed {
+		m.clamp()
+	} else {
+		m.clampOffset()
+	}
 }
+
+// ScrollDown moves the window one row toward the end without moving the
+// cursor, stopping at the last page. The cursor may scroll out of view; the
+// next cursor move brings it back.
+func (m *Model) ScrollDown() {
+	m.offset++
+	m.clampOffset()
+}
+
+// ScrollUp moves the window one row toward the start without moving the
+// cursor, stopping at the first row.
+func (m *Model) ScrollUp() {
+	m.offset--
+	m.clampOffset()
+}
+
+// Offset returns the index of the first visible row.
+func (m Model) Offset() int { return m.offset }
 
 // MoveDown advances the cursor, wrapping from the last item to the first.
 func (m *Model) MoveDown() {
@@ -101,7 +126,17 @@ func (m *Model) clamp() {
 	if m.cursor >= m.offset+m.height {
 		m.offset = m.cursor - m.height + 1
 	}
-	m.offset = max(0, min(m.offset, max(0, n-m.height)))
+	m.clampOffset()
+}
+
+// clampOffset keeps the window within the list bounds without regard to the
+// cursor: never past the last page and never before the first row.
+func (m *Model) clampOffset() {
+	if m.height <= 0 {
+		m.offset = 0
+		return
+	}
+	m.offset = max(0, min(m.offset, max(0, len(m.items)-m.height)))
 }
 
 // View renders the visible window of rows, one item per line, each fitted to

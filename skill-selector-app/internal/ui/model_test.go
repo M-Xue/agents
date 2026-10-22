@@ -188,6 +188,65 @@ func TestClickFocusesPanel(t *testing.T) {
 	}
 }
 
+func wheel(m *Model, x, y int, button tea.MouseButton) {
+	m.Update(tea.MouseMsg{X: x, Y: y, Action: tea.MouseActionPress, Button: button})
+}
+
+func TestWheelScrollsPanelUnderPointerWithoutFocus(t *testing.T) {
+	m, _ := newModel(t) // 160x40 window, libraries focused
+	widths, height := m.panelGeometry()
+	top := verticalPadding + panelTopRows
+	row := top + height/2
+	detailsX := horizontalPadding + widths[0] + widths[1] + 2*panelGap + 1
+	skillsX := horizontalPadding + widths[0] + panelGap + 1
+
+	// Make the details long enough to scroll.
+	m.detailsSrc = strings.Repeat("line\n\n", 200) // separate paragraphs survive markdown rendering
+	m.renderDetails()
+	view(m) // size the components
+
+	wheel(m, detailsX, row, tea.MouseButtonWheelDown)
+	wheel(m, detailsX, row, tea.MouseButtonWheelDown)
+	if m.details.Offset() != 2 {
+		t.Fatalf("details offset = %d after two wheel downs, want 2", m.details.Offset())
+	}
+	wheel(m, detailsX, row, tea.MouseButtonWheelUp)
+	if m.details.Offset() != 1 {
+		t.Fatalf("details offset = %d after wheel up, want 1", m.details.Offset())
+	}
+	if m.focused != panelLibraries {
+		t.Fatal("wheel over details changed focus")
+	}
+
+	// Shrink the window until the Skills list shows a single row, then the
+	// wheel scrolls the list window while the cursor stays on apple.
+	m.Update(tea.WindowSizeMsg{Width: 160, Height: 13})
+	view(m)
+	_, height = m.panelGeometry()
+	row = verticalPadding + panelTopRows + height/2
+	wheel(m, skillsX, row, tea.MouseButtonWheelDown)
+	if m.skills.Offset() != 1 {
+		t.Fatalf("skills offset = %d after wheel down, want 1", m.skills.Offset())
+	}
+	if sel, _ := m.skills.Selected(); sel.ID == "" || !strings.HasSuffix(sel.ID, "apple") {
+		t.Fatalf("wheel moved the skills cursor to %q", sel.ID)
+	}
+	if v := view(m); !strings.Contains(v, "banana") || strings.Contains(v, "apple") {
+		t.Fatalf("skills list did not scroll to banana: %q", v)
+	}
+	if m.focused != panelLibraries {
+		t.Fatal("wheel over skills changed focus")
+	}
+
+	// Wheel events outside every panel are ignored.
+	before := m.skills.Offset()
+	wheel(m, 0, row, tea.MouseButtonWheelUp)
+	wheel(m, skillsX, verticalPadding, tea.MouseButtonWheelUp)
+	if m.skills.Offset() != before {
+		t.Fatal("wheel outside the panels scrolled a list")
+	}
+}
+
 // footer returns the last non-blank line of the rendered screen.
 func footer(m *Model) string {
 	lines := strings.Split(view(m), "\n")
