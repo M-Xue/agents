@@ -1,5 +1,6 @@
 // Command skill-selector-app is the entry point for the TUI; build it with
-// go build in this directory, or install it with scripts/install.sh.
+// go build in this directory, or install it as the `skills` command with
+// scripts/install.sh.
 // It locates the agents workspace, constructs the app and starts the UI.
 package main
 
@@ -35,7 +36,7 @@ func main() {
 		fail(err)
 	}
 	if _, err := tea.NewProgram(ui.New(application), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run(); err != nil {
-		fail(fmt.Errorf("running skill-selector: %w", err))
+		fail(fmt.Errorf("running skills: %w", err))
 	}
 }
 
@@ -65,6 +66,6 @@ func locate(root string) (skills.Repo, error) {
 }
 
 func fail(err error) {
-	fmt.Fprintf(os.Stderr, "skill-selector: %v\n", err)
+	fmt.Fprintf(os.Stderr, "skills: %v\n", err)
 	os.Exit(1)
 }

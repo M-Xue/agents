@@ -8,7 +8,7 @@
 set -eu
 
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
-BINARY_PATH="$BIN_DIR/skill-selector"
+BINARY_PATH="$BIN_DIR/skills"
 
 if [ -e "$BINARY_PATH" ]; then
     rm -f "$BINARY_PATH"
@@ -17,4 +17,4 @@ else
     printf '%s\n' "nothing to remove: $BINARY_PATH does not exist"
 fi
 
-printf '%s\n' "skill-selector uninstalled"
+printf '%s\n' "skills uninstalled"

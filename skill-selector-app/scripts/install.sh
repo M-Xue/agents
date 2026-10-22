@@ -1,6 +1,7 @@
 #!/bin/sh
 
-# Builds skill-selector and installs it to $BIN_DIR (default ~/.local/bin).
+# Builds the skill selector and installs it to $BIN_DIR (default ~/.local/bin)
+# as the `skills` command.
 # The agents workspace this checkout lives in is compiled into the binary, so
 # the installed command works from any directory. It is safe to re-run: each
 # run rebuilds into the same location.
@@ -8,7 +9,7 @@
 set -eu
 
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
-BINARY_PATH="$BIN_DIR/skill-selector"
+BINARY_PATH="$BIN_DIR/skills"
 
 PLATFORM="$(uname -s)"
 case "$PLATFORM" in
@@ -21,7 +22,7 @@ case "$PLATFORM" in
 esac
 
 if ! command -v go >/dev/null 2>&1; then
-    printf '%s\n' "go is required to install skill-selector" >&2
+    printf '%s\n' "go is required to install skills" >&2
     exit 1
 fi
 
@@ -35,7 +36,7 @@ mkdir -p "$BIN_DIR"
 (cd "$app_dir" && go build -ldflags "-X main.defaultRoot=$workspace_root" -o "$BINARY_PATH" .)
 chmod +x "$BINARY_PATH"
 
-printf '%s\n' "installed skill-selector to $BINARY_PATH (workspace: $workspace_root)"
+printf '%s\n' "installed skills to $BINARY_PATH (workspace: $workspace_root)"
 
 case ":${PATH:-}:" in
     *":$BIN_DIR:"*)

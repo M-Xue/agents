@@ -8,7 +8,7 @@ one-way dependency flow.
 
 The `main` package lives at the module root, so a plain `go build` in this
 directory produces `./skill-selector-app`. For day-to-day use run the
-installer instead, which builds the binary to `~/.local/bin/skill-selector`
+installer instead, which builds the binary to `~/.local/bin/skills`
 (honouring `$BIN_DIR`) and compiles in the path of the workspace this checkout
 belongs to, so the command works from any directory:
 
