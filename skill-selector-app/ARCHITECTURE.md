@@ -22,8 +22,10 @@ skill-selector-app/
     │   │   └── theme.go        shared chrome colours (borders, title tab)
     │   └── component/          independent presentation components, one per folder
     │       ├── doc.go          the component rules
-    │       └── panel/
-    │           └── panel.go    titled sharp-cornered box: New(title, w, h), View(content)
+    │       ├── panel/
+    │       │   └── panel.go    titled sharp-cornered box: New(title, w, h), View(content)
+    │       └── checklist/
+    │           └── checklist.go scrollable checked/clear list with cursor
     ├── app/                    general business logic, coordinates skills + files
     │   ├── doc.go
     │   └── app.go              App struct, New()
@@ -61,6 +63,11 @@ split into two subpackages so screens stay free of styling detail:
   content padded one column from each side, always filled to the exact
   width and height requested. `panel.Tab` renders the standalone app title in
   the same style.
+- `ui/component/checklist` is a scrolling list of `Item{ID, Checked, Label}`
+  rows. Unchecked rows show U+E640, checked rows U+F4A7 (both Nerd Font
+  glyphs), the cursor row is bold. The component owns the cursor and scroll
+  offset and wraps at both ends; checked state is passed in by the caller
+  and never mutated by the component.
 
 #### Component rules
 
@@ -95,6 +102,12 @@ focus between them; the focused panel takes the active border colour. The footer
 General business logic. It coordinates the `skills` and `files` packages and
 exposes the operations the UI needs. It knows nothing about the terminal and
 can be driven from tests or a future CLI without changes.
+
+Selection state lives here, not in the UI. The checklist component reports
+which row is under the cursor; `app.ToggleSkill` flips the selection and the
+UI re-reads `app.Skills` plus `app.IsSelected` to rebuild the rows. The
+current skill list is hard-coded placeholder data to be replaced once the
+`skills` package discovers real directories.
 
 ### `internal/skills`
 

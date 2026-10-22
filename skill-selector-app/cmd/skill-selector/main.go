@@ -8,11 +8,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/maxx/skill-selector-app/internal/app"
 	"github.com/maxx/skill-selector-app/internal/ui"
 )
 
 func main() {
-	p := tea.NewProgram(ui.New(), tea.WithAltScreen())
+	p := tea.NewProgram(ui.New(app.New()), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error running skill-selector: %v\n", err)
 		os.Exit(1)
