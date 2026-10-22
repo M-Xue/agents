@@ -208,7 +208,12 @@ left and right and 2 rows on the top and bottom. Inside it, from top to
 bottom: the app tab, a blank line, the panels, then a single reserved row for
 the help footer. The panels run right down to the footer with no gap. The three panels, Skill Libraries, Skills and Details, are
 split 1:1:2 with a single blank column between each. Tab and shift+tab move
-focus between them; the focused panel takes the active border colour. The footer is rendered with
+focus between them, and a left click inside a panel focuses it; the focused
+panel takes the active border colour. `panelGeometry` is the single source
+of the panel widths and height, used both to draw them and, in `panelAt`, to
+map a click to a panel, so the two cannot drift apart. Mouse reporting is
+enabled in `main` with `tea.WithMouseCellMotion`. Clicking is not listed in
+the help footer. The footer is rendered with
 `bubbles/help` in short mode from the bindings in `keys.go`.
 
 ### `internal/app`

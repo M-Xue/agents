@@ -184,6 +184,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			if id, ok := m.panelAt(msg.X, msg.Y); ok {
+				m.setFocus(id)
+			}
+		}
+		return m, nil
 	case tea.KeyMsg:
 		m.status = ""
 		switch {
@@ -289,17 +296,44 @@ func searchLabel(text string) string {
 	return lipgloss.NewStyle().Foreground(theme.BorderActive).Bold(true).Render(text)
 }
 
+// panelTopRows is the number of rows above the panels inside the content
+// area: the app tab and the blank line beneath it.
+const panelTopRows = 2
+
+// panelGeometry returns the column widths of the panels and their shared
+// height for the current window size. View and panelAt both use it so what
+// is drawn and what is clickable always agree.
+func (m *Model) panelGeometry() (widths []int, height int) {
+	contentWidth := contentWidthFor(m.width)
+	bodyHeight := max(0, m.height-verticalPadding*2-footerRows)
+	return splitWidths(contentWidth, panelRatios[:]...), max(2, bodyHeight-panelTopRows)
+}
+
+// panelAt returns the panel drawn at window cell (x, y), or false when the
+// cell is padding, the title row, a gap between panels or the footer.
+func (m *Model) panelAt(x, y int) (panelID, bool) {
+	widths, height := m.panelGeometry()
+	top := verticalPadding + panelTopRows
+	if y < top || y >= top+height {
+		return 0, false
+	}
+	left := horizontalPadding
+	for i, w := range widths {
+		if x >= left && x < left+w {
+			return panelID(i), true
+		}
+		left += w + panelGap
+	}
+	return 0, false
+}
+
 // View composes the app tab, a blank line, then the three panels boxed
 // lazygit-style in a 1:1:2 split: Skill Libraries, Skills, Details. The
 // focused panel takes the active border. The footer sits at the bottom of
 // the padded content area.
 func (m *Model) View() string {
 	contentWidth := contentWidthFor(m.width)
-	bodyHeight := max(0, m.height-verticalPadding*2-footerRows)
-
-	// App tab plus blank line take two rows above the panels.
-	panelHeight := max(2, bodyHeight-2)
-	widths := splitWidths(contentWidth, panelRatios[:]...)
+	widths, panelHeight := m.panelGeometry()
 
 	views := make([]string, panelCount)
 	for i := range m.panels {
@@ -316,7 +350,7 @@ func (m *Model) View() string {
 		}
 		views[i] = p.View(content)
 	}
-	body := panel.Tab(appName) + "\n\n" + sideBySide(views, widths, panelHeight)
+	body := panel.Tab(appName) + strings.Repeat("\n", panelTopRows) + sideBySide(views, widths, panelHeight)
 
 	m.help.Width = contentWidth
 	footer := m.help.ShortHelpView(m.keys.ShortHelp())

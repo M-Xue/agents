@@ -139,3 +139,51 @@ func TestSearchFilterMovesSelection(t *testing.T) {
 		t.Fatal("empty state not shown when no skill matches")
 	}
 }
+
+func click(m *Model, x, y int) {
+	m.Update(tea.MouseMsg{X: x, Y: y, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+}
+
+func TestClickFocusesPanel(t *testing.T) {
+	m, _ := newModel(t) // 160x40 window
+	widths, height := m.panelGeometry()
+	top := verticalPadding + panelTopRows
+	row := top + height/2
+
+	cases := []struct {
+		name string
+		x    int
+		want panelID
+	}{
+		{"skills", horizontalPadding + widths[0] + panelGap + 1, panelSkills},
+		{"details", horizontalPadding + widths[0] + widths[1] + 2*panelGap + 1, panelDetails},
+		{"libraries", horizontalPadding + 1, panelLibraries},
+	}
+	for _, tc := range cases {
+		click(m, tc.x, row)
+		if m.focused != tc.want {
+			t.Fatalf("click %s at x=%d: focused %d, want %d", tc.name, tc.x, m.focused, tc.want)
+		}
+	}
+
+	// Clicks outside the panels leave focus alone: the title row, the gap
+	// between panels, the left margin and the footer.
+	m.setFocus(panelSkills)
+	for _, p := range [][2]int{
+		{horizontalPadding + 1, verticalPadding},
+		{horizontalPadding + widths[0], row},
+		{0, row},
+		{horizontalPadding + 1, m.height - verticalPadding - 1},
+	} {
+		click(m, p[0], p[1])
+		if m.focused != panelSkills {
+			t.Fatalf("click at %v changed focus to %d", p, m.focused)
+		}
+	}
+	// Right button and release events are ignored.
+	m.Update(tea.MouseMsg{X: horizontalPadding + 1, Y: row, Action: tea.MouseActionPress, Button: tea.MouseButtonRight})
+	m.Update(tea.MouseMsg{X: horizontalPadding + 1, Y: row, Action: tea.MouseActionRelease, Button: tea.MouseButtonLeft})
+	if m.focused != panelSkills {
+		t.Fatal("non-left-press mouse event changed focus")
+	}
+}

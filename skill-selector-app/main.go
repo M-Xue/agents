@@ -34,7 +34,7 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	if _, err := tea.NewProgram(ui.New(application), tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(ui.New(application), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run(); err != nil {
 		fail(fmt.Errorf("running skill-selector: %w", err))
 	}
 }
