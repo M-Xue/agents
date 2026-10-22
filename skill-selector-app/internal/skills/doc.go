@@ -1,6 +1,9 @@
-// Package skills processes agent skill directories.
+// Package skills describes the layout of the agents workspace.
 //
-// A skill is a directory containing a SKILL.md and supporting files.
-// This package discovers, parses and describes skills; it does not
-// touch the filesystem directly and relies on the files package.
+// It is the one place that knows where things live: the directory that
+// exposes selected skills to the agent, the directory of third-party skill
+// libraries, where a library keeps its skills and what a skill's main file
+// is called. It holds no behaviour beyond building those paths and locating
+// the workspace root; discovering, reading and linking skills is done by app
+// using files.
 package skills
