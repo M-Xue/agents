@@ -209,7 +209,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // updateMouse routes mouse events by the panel under the pointer, not by
-// focus. A left click focuses that panel. The wheel scrolls the list or file
+// focus. A left click focuses that panel, or, when the panel already has
+// focus, acts on the row under the pointer (see clickRow). The wheel scrolls the list or file
 // in that panel one row per notch without changing focus or moving the
 // cursor, so a user can read a long skill file or skim a long list while
 // still typing in a search elsewhere. Any other mouse event is ignored.
@@ -220,12 +221,67 @@ func (m *Model) updateMouse(msg tea.MouseMsg) {
 	}
 	switch {
 	case msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft:
-		m.setFocus(id)
+		m.status = ""
+		if id != m.focused {
+			m.setFocus(id)
+			return
+		}
+		m.clickRow(id, msg.Y)
 	case msg.Button == tea.MouseButtonWheelUp:
 		m.scrollPanel(id, -1)
 	case msg.Button == tea.MouseButtonWheelDown:
 		m.scrollPanel(id, 1)
 	}
+}
+
+// clickRow handles a left click inside an already-focused panel. In Skill
+// Libraries it selects the library row under the pointer and loads its
+// skills. In Skills a click on an unselected row selects it and shows its
+// file; a click on the row that is already selected toggles its link, the
+// same as pressing enter. Clicks on the search bar, the padding or below the
+// last row do nothing. Details has no rows to click.
+func (m *Model) clickRow(id panelID, y int) {
+	row, ok := m.listRowAt(y)
+	if !ok {
+		return
+	}
+	switch id {
+	case panelLibraries:
+		if m.libraries.Select(m.libraries.Offset() + row) {
+			m.syncLibrary()
+		}
+	case panelSkills:
+		idx := m.skills.Offset() + row
+		if idx != m.skills.Cursor() {
+			if m.skills.Select(idx) {
+				m.syncDetails()
+			}
+			return
+		}
+		if sel, ok := m.skills.Selected(); ok {
+			if err := m.app.ToggleSkill(sel.ID); err != nil {
+				m.status = err.Error()
+			}
+			m.syncSkills()
+		}
+	}
+}
+
+// listRowAt maps a window row to a visible row index of a search panel's
+// list: 0 is the first row beneath the search bar. It reports false when y
+// falls on the border, padding, search rows or past the list's height.
+// Both search panels share the same vertical layout, so one mapping serves
+// Skill Libraries and Skills alike.
+func (m *Model) listRowAt(y int) (int, bool) {
+	_, panelHeight := m.panelGeometry()
+	// Top border, then the interior rows above the list.
+	first := verticalPadding + panelTopRows + 1 + listTopPadding + searchRows
+	listHeight := max(0, panelHeight-2-listTopPadding-searchRows)
+	row := y - first
+	if row < 0 || row >= listHeight {
+		return 0, false
+	}
+	return row, true
 }
 
 // scrollPanel scrolls the scrollable component in the given panel by one

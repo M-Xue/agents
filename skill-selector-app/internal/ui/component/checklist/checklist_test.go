@@ -142,3 +142,21 @@ func TestScrollMovesWindowNotCursor(t *testing.T) {
 		t.Fatalf("MoveDown after scroll: id=%q offset=%d", sel.ID, m.Offset())
 	}
 }
+
+func TestSelect(t *testing.T) {
+	m := New()
+	m.SetItems(items(10))
+	m.SetSize(20, 4)
+	if !m.Select(7) {
+		t.Fatal("Select(7) reported out of range")
+	}
+	if sel, _ := m.Selected(); sel.ID != "7" || m.Offset() != 4 {
+		t.Fatalf("after Select(7): id=%q offset=%d", sel.ID, m.Offset())
+	}
+	if m.Select(10) || m.Select(-1) {
+		t.Fatal("out-of-range Select reported success")
+	}
+	if sel, _ := m.Selected(); sel.ID != "7" {
+		t.Fatalf("out-of-range Select moved the cursor to %q", sel.ID)
+	}
+}

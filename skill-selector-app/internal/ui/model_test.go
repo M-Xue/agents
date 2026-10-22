@@ -247,6 +247,78 @@ func TestWheelScrollsPanelUnderPointerWithoutFocus(t *testing.T) {
 	}
 }
 
+func TestClickSelectsRowInFocusedPanel(t *testing.T) {
+	m, repo := newModel(t) // 160x40 window, libraries focused
+	widths, _ := m.panelGeometry()
+	firstRow := verticalPadding + panelTopRows + 1 + listTopPadding + searchRows
+	libX := horizontalPadding + 1
+	skillsX := horizontalPadding + widths[0] + panelGap + 1
+	linked := func(name string) bool {
+		fi, err := os.Lstat(filepath.Join(repo.ExposedDir(), name))
+		return err == nil && fi.Mode()&os.ModeSymlink != 0
+	}
+
+	// Libraries is focused: clicking its second row selects beta.
+	click(m, libX, firstRow+1)
+	if sel, _ := m.libraries.Selected(); sel.Label != "beta" {
+		t.Fatalf("click did not select beta: %q", sel.Label)
+	}
+	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") {
+		t.Fatal("selecting beta by click did not load its skills")
+	}
+	click(m, libX, firstRow) // back to alpha
+	if v := view(m); !strings.Contains(v, "APPLE SKILL BODY") {
+		t.Fatal("click back to alpha did not reload its skills")
+	}
+
+	// Clicking the search row or past the last row changes nothing.
+	click(m, libX, firstRow-searchRows)
+	click(m, libX, firstRow+5)
+	if sel, _ := m.libraries.Selected(); sel.Label != "alpha" {
+		t.Fatalf("non-row click moved the selection to %q", sel.Label)
+	}
+
+	// Skills is not focused: the first click only focuses it.
+	click(m, skillsX, firstRow+1)
+	if m.focused != panelSkills {
+		t.Fatal("click on unfocused skills did not focus it")
+	}
+	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "apple") || linked("banana") {
+		t.Fatalf("focusing click acted on a row: cursor=%q banana linked=%v", sel.ID, linked("banana"))
+	}
+
+	// Now focused: clicking banana only selects it, since it was not the
+	// selected row. The details follow, but nothing is toggled yet.
+	click(m, skillsX, firstRow+1)
+	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "banana") {
+		t.Fatalf("click did not select banana: %q", sel.ID)
+	}
+	if linked("banana") {
+		t.Fatal("click on an unselected skill toggled it")
+	}
+	if v := view(m); !strings.Contains(v, "BANANA SKILL BODY") {
+		t.Fatal("details did not follow the clicked skill")
+	}
+	// Clicking the selected row toggles it on, and again toggles it off,
+	// keeping the selection throughout.
+	click(m, skillsX, firstRow+1)
+	if !linked("banana") {
+		t.Fatal("click on the selected skill did not link it")
+	}
+	click(m, skillsX, firstRow+1)
+	if linked("banana") {
+		t.Fatal("third click did not unlink banana")
+	}
+	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "banana") {
+		t.Fatalf("toggling clicks moved the cursor to %q", sel.ID)
+	}
+	// A click below the last skill neither moves nor toggles.
+	click(m, skillsX, firstRow+2)
+	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "banana") || linked("apple") {
+		t.Fatal("click past the last row acted on a skill")
+	}
+}
+
 // footer returns the last non-blank line of the rendered screen.
 func footer(m *Model) string {
 	lines := strings.Split(view(m), "\n")

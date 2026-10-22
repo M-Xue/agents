@@ -107,6 +107,20 @@ func (m *Model) MoveUp() {
 	m.clamp()
 }
 
+// Select moves the cursor to the row at index i and scrolls it into view.
+// It reports false and leaves the cursor alone when i is out of range.
+func (m *Model) Select(i int) bool {
+	if i < 0 || i >= len(m.items) {
+		return false
+	}
+	m.cursor = i
+	m.clamp()
+	return true
+}
+
+// Cursor returns the index of the row under the cursor.
+func (m Model) Cursor() int { return m.cursor }
+
 // Selected returns the item under the cursor, or false when the list is empty.
 func (m Model) Selected() (Item, bool) {
 	if m.cursor < 0 || m.cursor >= len(m.items) {

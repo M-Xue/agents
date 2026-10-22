@@ -229,7 +229,14 @@ bottom: the app tab, a blank line, the panels, then a single reserved row for
 the help footer. The panels run right down to the footer with no gap. The three panels, Skill Libraries, Skills and Details, are
 split 1:1:2 with a single blank column between each. Tab and shift+tab move
 focus between them, and a left click inside a panel focuses it; the focused
-panel takes the active border colour. The mouse wheel scrolls whichever
+panel takes the active border colour. A left click inside the panel that
+already has focus acts on the row under the pointer: in Skill Libraries it
+selects that library; in Skills it selects that skill, and a click on the
+skill that is already selected toggles its link, as enter would. So from
+another panel, a skill is toggled with three clicks: focus, select, toggle.
+`listRowAt` maps the
+window row to a list row from the shared search-panel layout, and clicks on
+the search bar, the padding or below the last row do nothing. The mouse wheel scrolls whichever
 panel is under the pointer, one row per notch, regardless of focus: the
 library and skill lists scroll their window without moving the cursor, and
 the details file scrolls by wrapped line. `panelGeometry` is the single
