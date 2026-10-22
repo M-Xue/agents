@@ -11,6 +11,7 @@ import (
 	"github.com/maxx/skill-selector-app/internal/app"
 	"github.com/maxx/skill-selector-app/internal/fuzzy"
 	"github.com/maxx/skill-selector-app/internal/ui/component/checklist"
+	"github.com/maxx/skill-selector-app/internal/ui/component/list"
 	"github.com/maxx/skill-selector-app/internal/ui/component/panel"
 	"github.com/maxx/skill-selector-app/internal/ui/component/searchbar"
 	"github.com/maxx/skill-selector-app/internal/ui/theme"
@@ -54,10 +55,14 @@ type Model struct {
 	height  int
 	focused panelID
 	panels  [panelCount]panel.Model
-	search  searchbar.Model
-	skills  checklist.Model
-	help    help.Model
-	keys    keyMap
+	// Skill Libraries panel: a plain list with its own search.
+	libSearch searchbar.Model
+	libraries list.Model
+	// Skills panel: a checklist with its own search.
+	search searchbar.Model
+	skills checklist.Model
+	help   help.Model
+	keys   keyMap
 }
 
 // New returns a Model ready to be passed to tea.NewProgram.
@@ -65,17 +70,34 @@ func New(application *app.App) *Model {
 	h := help.New()
 	h.ShowAll = false
 	m := &Model{
-		app:    application,
-		help:   h,
-		keys:   defaultKeyMap(),
-		search: searchbar.New(""),
-		skills: checklist.New(),
+		app:       application,
+		help:      h,
+		keys:      defaultKeyMap(),
+		libSearch: searchbar.New(""),
+		libraries: list.New(),
+		search:    searchbar.New(""),
+		skills:    checklist.New(),
 	}
 	for i := range m.panels {
 		m.panels[i] = panel.New(panelTitles[i], 0, 0)
 	}
+	m.setFocus(panelLibraries)
+	m.syncLibraries()
 	m.syncSkills()
 	return m
+}
+
+// syncLibraries rebuilds the library rows from app state, piped through the
+// fuzzy predicate built from the libraries search value.
+func (m *Model) syncLibraries() {
+	libs := m.app.Libraries()
+	items := make([]list.Item, 0, len(libs))
+	for _, l := range libs {
+		items = append(items, list.Item{ID: l.ID, Label: l.Label})
+	}
+	match := fuzzy.Predicate(m.libSearch.Value())
+	items = fuzzy.Filter(items, func(it list.Item) bool { return match(it.Label) })
+	m.libraries.SetItems(items)
 }
 
 // syncSkills rebuilds the checklist rows: app state is mapped to items, then
@@ -110,6 +132,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setFocus((m.focused + 1) % panelCount)
 		case key.Matches(msg, m.keys.PrevPanel):
 			m.setFocus((m.focused + panelCount - 1) % panelCount)
+		case m.focused == panelLibraries:
+			m.updateLibraries(msg)
 		case m.focused == panelSkills:
 			m.updateSkills(msg)
 		}
@@ -129,10 +153,30 @@ func (m *Model) setFocus(id panelID) {
 			m.panels[i].Blur()
 		}
 	}
+	if id == panelLibraries {
+		m.libSearch.Focus()
+	} else {
+		m.libSearch.Blur()
+	}
 	if id == panelSkills {
 		m.search.Focus()
 	} else {
 		m.search.Blur()
+	}
+}
+
+// updateLibraries handles keys while the Skill Libraries panel has focus.
+// Arrows move the cursor; everything else goes to the search bar.
+func (m *Model) updateLibraries(msg tea.KeyMsg) {
+	switch {
+	case key.Matches(msg, m.keys.Up):
+		m.libraries.MoveUp()
+	case key.Matches(msg, m.keys.Down):
+		m.libraries.MoveDown()
+	default:
+		if m.libSearch.Update(msg) {
+			m.syncLibraries()
+		}
 	}
 }
 
@@ -180,7 +224,10 @@ func (m *Model) View() string {
 		p := &m.panels[i]
 		p.SetSize(widths[i], panelHeight)
 		content := ""
-		if panelID(i) == panelSkills {
+		switch panelID(i) {
+		case panelLibraries:
+			content = m.librariesContent(p)
+		case panelSkills:
 			content = m.skillsContent(p)
 		}
 		views[i] = p.View(content)
@@ -192,21 +239,38 @@ func (m *Model) View() string {
 	return frame(body, footer, m.width, m.height)
 }
 
-// skillsContent lays out the Skills panel interior: a blank row, the
-// labelled search field, a blank row, then the checklist filling the rest.
+// librariesContent lays out the Skill Libraries panel interior: search bar
+// on top, the plain list filling the rest.
+func (m *Model) librariesContent(p *panel.Model) string {
+	listHeight := searchPanelListHeight(p)
+	m.libraries.SetSize(p.InnerWidth(), listHeight)
+	return searchPanelContent(p, &m.libSearch, m.libraries.View())
+}
+
+// skillsContent lays out the Skills panel interior: search bar on top, the
+// checklist filling the rest.
 func (m *Model) skillsContent(p *panel.Model) string {
-	label := searchLabel("Search") + " "
-	m.search.SetWidth(max(0, min(searchFieldWidth, p.InnerWidth()-lipgloss.Width(label))))
-	searchRow := label + m.search.View()
-
-	listHeight := max(0, p.InnerHeight()-listTopPadding-searchRows)
+	listHeight := searchPanelListHeight(p)
 	m.skills.SetSize(p.InnerWidth(), listHeight)
+	return searchPanelContent(p, &m.search, m.skills.View())
+}
 
-	rows := make([]string, 0, listTopPadding+searchRows+listHeight)
+// searchPanelListHeight is the rows left for a list beneath a panel's top
+// padding and search rows.
+func searchPanelListHeight(p *panel.Model) int {
+	return max(0, p.InnerHeight()-listTopPadding-searchRows)
+}
+
+// searchPanelContent stacks a panel interior: a blank row, the labelled
+// search field sized to the panel, a blank row, then body.
+func searchPanelContent(p *panel.Model, search *searchbar.Model, body string) string {
+	label := searchLabel("Search") + " "
+	search.SetWidth(max(0, min(searchFieldWidth, p.InnerWidth()-lipgloss.Width(label))))
+	rows := make([]string, 0, listTopPadding+searchRows)
 	for i := 0; i < listTopPadding; i++ {
 		rows = append(rows, "")
 	}
-	rows = append(rows, searchRow, "")
-	rows = append(rows, strings.Split(m.skills.View(), "\n")...)
+	rows = append(rows, label+search.View(), "")
+	rows = append(rows, strings.Split(body, "\n")...)
 	return strings.Join(rows, "\n")
 }

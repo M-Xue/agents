@@ -24,6 +24,8 @@ skill-selector-app/
     │       ├── doc.go          the component rules
     │       ├── panel/
     │       │   └── panel.go    titled sharp-cornered box: New(title, w, h), View(content)
+    │       ├── list/
+    │       │   └── list.go     scrollable plain list with cursor
     │       ├── checklist/
     │       │   └── checklist.go scrollable checked/clear list with cursor
     │       └── searchbar/
@@ -67,6 +69,9 @@ split into two subpackages so screens stay free of styling detail:
   content padded one column from each side, always filled to the exact
   width and height requested. `panel.Tab` renders the standalone app title in
   the same style.
+- `ui/component/list` is a scrolling list of `Item{ID, Label}` rows with a
+  bold cursor row. It owns the cursor and scroll offset, wraps at both ends,
+  and keeps the cursor on the same ID across `SetItems` or snaps to the top.
 - `ui/component/checklist` is a scrolling list of `Item{ID, Checked, Label}`
   rows. Unchecked rows show U+E640, checked rows U+F4A7 (both Nerd Font
   glyphs), the cursor row is bold. The component owns the cursor and scroll
@@ -103,6 +108,13 @@ Key routing while the Skills panel has focus: up and down move the cursor,
 enter toggles the row under the cursor via `app.ToggleSkill`, and every other
 key goes to the search bar. Because letters and space type into the search,
 quit is ctrl+c only and there are no j/k aliases.
+
+The Skill Libraries panel uses the same shape with the plain `list`
+component and its own search bar: `app.Libraries()` is mapped to list items
+and filtered by that panel's search value in `syncLibraries`. Both panels
+share one layout helper, `searchPanelContent`, that stacks the top padding,
+the labelled search row, a blank row and the list body. Each search bar is
+focused only while its panel is.
 
 #### Component rules
 
@@ -141,8 +153,8 @@ can be driven from tests or a future CLI without changes.
 Selection state lives here, not in the UI. The checklist component reports
 which row is under the cursor; `app.ToggleSkill` flips the selection and the
 UI re-reads `app.Skills` plus `app.IsSelected` to rebuild the rows. The
-current skill list is hard-coded placeholder data to be replaced once the
-`skills` package discovers real directories.
+current skill and library lists are hard-coded placeholder data to be
+replaced once the `skills` package discovers real directories.
 
 ### `internal/skills`
 

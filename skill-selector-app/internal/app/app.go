@@ -11,8 +11,16 @@ const dummySkillCount = 80
 // state to render against. They will be replaced when the skills and files
 // packages are implemented.
 type App struct {
-	skills   []Skill
-	selected map[string]bool
+	libraries []Library
+	skills    []Skill
+	selected  map[string]bool
+}
+
+// Library is a placeholder description of a skill library (a directory of
+// skills) until the skills package provides the real type.
+type Library struct {
+	ID    string
+	Label string
 }
 
 // Skill is a placeholder description of a skill until the skills package
@@ -25,9 +33,15 @@ type Skill struct {
 // New constructs an App with its dependencies.
 func New() *App {
 	return &App{
-		skills:   dummySkills(),
-		selected: map[string]bool{},
+		libraries: dummyLibraries(),
+		skills:    dummySkills(),
+		selected:  map[string]bool{},
 	}
+}
+
+// Libraries returns the known skill libraries in display order.
+func (a *App) Libraries() []Library {
+	return append([]Library(nil), a.libraries...)
 }
 
 // Skills returns the known skills in display order.
@@ -45,6 +59,23 @@ func (a *App) ToggleSkill(id string) {
 		return
 	}
 	a.selected[id] = true
+}
+
+// dummyLibraryCount is how many placeholder libraries dummyLibraries returns.
+const dummyLibraryCount = 80
+
+// dummyLibraries is placeholder data; delete once libraries are read from disk.
+func dummyLibraries() []Library {
+	names := []string{
+		"anthropic-skills", "otter-tools", "canva-university", "personal",
+		"team-shared", "experiments", "archive", "vendor",
+	}
+	libs := make([]Library, 0, dummyLibraryCount)
+	for i := 0; i < dummyLibraryCount; i++ {
+		name := fmt.Sprintf("%s-%02d", names[i%len(names)], i+1)
+		libs = append(libs, Library{ID: name, Label: name})
+	}
+	return libs
 }
 
 // dummySkills is placeholder data; delete once skills are discovered on disk.
