@@ -71,7 +71,7 @@ The installer builds the binary and places it on your path. It locates this
 repo itself, so you can run it from any directory:
 
 ```bash
-sh skill-selector-app/scripts/install.sh
+sh skill-selector-app/install.sh
 ```
 
 This builds the selector and installs it as `skills` at `~/.local/bin/skills`
@@ -93,7 +93,7 @@ location and is idempotent.
 ### Uninstall
 
 ```bash
-sh skill-selector-app/scripts/uninstall.sh
+sh skill-selector-app/uninstall.sh
 ```
 
 This removes the binary `install.sh` created. It honors the same `$BIN_DIR`

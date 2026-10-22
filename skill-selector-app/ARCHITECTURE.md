@@ -13,8 +13,8 @@ installer instead, which builds the binary to `~/.local/bin/skills`
 belongs to, so the command works from any directory:
 
 ```
-sh scripts/install.sh
-sh scripts/uninstall.sh
+sh install.sh
+sh uninstall.sh
 ```
 
 The compiled-in path is only a fallback: an explicit `-root` wins, then a
@@ -28,9 +28,8 @@ skill-selector-app/
 ├── go.mod                      module github.com/maxx/skill-selector-app
 ├── .gitignore
 ├── main.go                     entry point: finds the workspace, wires packages together
-├── scripts/
-│   ├── install.sh              build to $BIN_DIR with the workspace path compiled in
-│   └── uninstall.sh            remove that binary
+├── install.sh                  build to $BIN_DIR as `skills` with the workspace path compiled in
+├── uninstall.sh                remove that binary
 └── internal/
     ├── ui/                     Bubble Tea TUI (model, update, view)
     │   ├── doc.go

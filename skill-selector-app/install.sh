@@ -27,9 +27,9 @@ if ! command -v go >/dev/null 2>&1; then
 fi
 
 # Resolve paths from the script's own location so this works from anywhere:
-# scripts/ -> skill-selector-app/ -> the agents workspace root.
-script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-app_dir=$(dirname "$script_dir")
+# this script sits in skill-selector-app/, whose parent is the agents
+# workspace root.
+app_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 workspace_root=$(dirname "$app_dir")
 
 mkdir -p "$BIN_DIR"

@@ -1,6 +1,6 @@
 // Command skill-selector-app is the entry point for the TUI; build it with
 // go build in this directory, or install it as the `skills` command with
-// scripts/install.sh.
+// install.sh.
 // It locates the agents workspace, constructs the app and starts the UI.
 package main
 
@@ -18,7 +18,7 @@ import (
 )
 
 // defaultRoot is the workspace to fall back on when none is found above the
-// current directory. scripts/install.sh sets it at build time with
+// current directory. install.sh sets it at build time with
 // -ldflags "-X main.defaultRoot=<path>" so the installed command works from
 // anywhere; a plain go build leaves it empty.
 var defaultRoot string
