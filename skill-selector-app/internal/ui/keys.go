@@ -2,30 +2,22 @@ package ui
 
 import "github.com/charmbracelet/bubbles/key"
 
-// keyMap defines the key bindings for the screen. It satisfies help.KeyMap
-// so the help component can render it.
+// keyMap holds the bindings rendered in the footer help bar.
 type keyMap struct {
 	NextPanel key.Binding
+	PrevPanel key.Binding
 	Quit      key.Binding
 }
 
-// ShortHelp returns the bindings shown in the single-line help view.
+func defaultKeyMap() keyMap {
+	return keyMap{
+		NextPanel: key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next panel")),
+		PrevPanel: key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "prev panel")),
+		Quit:      key.NewBinding(key.WithKeys("ctrl+c", "q"), key.WithHelp("q", "quit")),
+	}
+}
+
+// ShortHelp returns the bindings shown in the single-line footer, in order.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.NextPanel, k.Quit}
-}
-
-// FullHelp returns the bindings shown in the expanded help view.
-func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{k.NextPanel, k.Quit}}
-}
-
-var keys = keyMap{
-	NextPanel: key.NewBinding(
-		key.WithKeys("tab"),
-		key.WithHelp("tab", "next panel"),
-	),
-	Quit: key.NewBinding(
-		key.WithKeys("q", "ctrl+c"),
-		key.WithHelp("q", "quit"),
-	),
+	return []key.Binding{k.NextPanel, k.PrevPanel, k.Quit}
 }

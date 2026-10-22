@@ -1,91 +1,89 @@
 package ui
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+
+	"github.com/maxx/skill-selector-app/internal/ui/components/panel"
 )
 
-// panelCount is the number of panels shown on the single screen.
-const panelCount = 3
+// appName is rendered as the title tab above the panels.
+const appName = "skill-selector"
 
-// panelTitles are placeholder headings until the panels have real content.
-var panelTitles = [panelCount]string{"Panel 1", "Panel 2", "Panel 3"}
+// panelID indexes the three side-by-side panels, left to right.
+type panelID int
+
+const (
+	panelLibraries panelID = iota
+	panelSkills
+	panelDetails
+	panelCount
+)
+
+// panelTitles are the tab labels, indexed by panelID.
+var panelTitles = [panelCount]string{"Skill Libraries", "Skills", "Details"}
+
+// panelRatios are the relative widths of the panels, indexed by panelID.
+var panelRatios = [panelCount]int{1, 1, 2}
 
 // Model is the root Bubble Tea model for the application.
 type Model struct {
-	focused int // index of the panel that has focus
 	width   int
 	height  int
+	focused panelID
 	help    help.Model
 	keys    keyMap
 }
 
 // New returns a Model ready to be passed to tea.NewProgram.
-func New() Model {
-	return Model{
-		help: help.New(),
-		keys: keys,
-	}
+func New() *Model {
+	h := help.New()
+	h.ShowAll = false
+	return &Model{help: h, keys: defaultKeyMap()}
 }
 
-// Init implements tea.Model.
-func (m Model) Init() tea.Cmd {
-	return nil
-}
+func (m *Model) Init() tea.Cmd { return nil }
 
-// Update implements tea.Model.
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.help.Width = msg.Width
+		return m, nil
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
 		case key.Matches(msg, m.keys.NextPanel):
 			m.focused = (m.focused + 1) % panelCount
+		case key.Matches(msg, m.keys.PrevPanel):
+			m.focused = (m.focused + panelCount - 1) % panelCount
 		}
 	}
 	return m, nil
 }
 
-// View implements tea.Model.
-func (m Model) View() string {
-	if m.width == 0 {
-		return "loading..."
+// View composes the app tab, a blank line, then the three panels boxed
+// lazygit-style in a 1:1:2 split: Skill Libraries, Skills, Details. The
+// focused panel takes the active border. The footer sits at the bottom of
+// the padded content area.
+func (m *Model) View() string {
+	contentWidth := contentWidthFor(m.width)
+	bodyHeight := max(0, m.height-verticalPadding*2-footerRows)
+
+	// App tab plus blank line take two rows above the panels.
+	panelHeight := max(2, bodyHeight-2)
+	widths := splitWidths(contentWidth, panelRatios[:]...)
+
+	panels := make([]string, panelCount)
+	for i := range panels {
+		id := panelID(i)
+		panels[i] = panel.Render(panelTitles[id], "", widths[i], panelHeight, id == m.focused)
 	}
+	body := panel.Tab(appName) + "\n\n" + sideBySide(panels, widths, panelHeight)
 
-	helpView := m.help.View(m.keys)
-
-	// Reserve one line for help and account for each panel's border.
-	panelWidth := m.width / panelCount
-	panelHeight := m.height - lipgloss.Height(helpView)
-
-	innerWidth := panelWidth - panelStyle.GetHorizontalFrameSize()
-	innerHeight := panelHeight - panelStyle.GetVerticalFrameSize()
-
-	panels := make([]string, 0, panelCount)
-	for i := 0; i < panelCount; i++ {
-		style := panelStyle
-		if i == m.focused {
-			style = focusedPanelStyle
-		}
-		content := titleStyle.Render(panelTitles[i])
-		panels = append(panels, style.
-			Width(innerWidth).
-			Height(innerHeight).
-			Render(content))
-	}
-
-	var b strings.Builder
-	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, panels...))
-	b.WriteString("\n")
-	b.WriteString(helpView)
-	return b.String()
+	m.help.Width = contentWidth
+	footer := m.help.ShortHelpView(m.keys.ShortHelp())
+	return frame(body, footer, m.width, m.height)
 }

@@ -15,7 +15,14 @@ skill-selector-app/
 └── internal/
     ├── ui/                     Bubble Tea TUI (model, update, view)
     │   ├── doc.go
-    │   └── model.go            Model struct, New()
+    │   ├── model.go            root Model, Init/Update/View
+    │   ├── layout.go           window frame: padding, footer rows, side-by-side panels
+    │   ├── keys.go             key bindings rendered in the help footer
+    │   ├── theme/
+    │   │   └── theme.go        shared chrome colours (borders, title tab)
+    │   └── components/
+    │       └── panel/
+    │           └── panel.go    titled sharp-cornered box, Tab(), Render(), Fit()
     ├── app/                    general business logic, coordinates skills + files
     │   ├── doc.go
     │   └── app.go              App struct, New()
@@ -41,6 +48,26 @@ starts the Bubble Tea program. It contains no logic of its own.
 Owns everything Bubble Tea: the root model, `Init`, `Update`, `View`, key
 handling and rendering. It never makes decisions about skills or files; it
 calls into `app` and displays the result.
+
+The visual chrome is a port of the grove TUI (`~/Experiments/grove`) and is
+split into two subpackages so screens stay free of styling detail:
+
+- `ui/theme` holds the colour palette. The active border and title tab are
+  ANSI 111 (light blue), inactive borders are ANSI 60 (slate), tab text is
+  ANSI 235 (near black).
+- `ui/components/panel` draws a lazygit-style pane: square corners, the title
+  rendered as a bold highlighted tab embedded in the top border (`┌─ Title ──┐`),
+  content padded one column from each side, always filled to the exact
+  width and height requested. `panel.Tab` renders the standalone app title in
+  the same style.
+
+`layout.go` owns the window frame. The content area is inset 4 columns on the
+left and right and 2 rows on the top and bottom. Inside it, from top to
+bottom: the app tab, a blank line, the panels, then a single reserved row for
+the help footer. The panels run right down to the footer with no gap. The three panels, Skill Libraries, Skills and Details, are
+split 1:1:2 with a single blank column between each. Tab and shift+tab move
+focus between them; the focused panel takes the active border colour. The footer is rendered with
+`bubbles/help` in short mode from the bindings in `keys.go`.
 
 ### `internal/app`
 
@@ -88,5 +115,6 @@ imports only `app`. Nothing imports `ui`.
   zero values, so an accidental call fails loudly.
 - Each package has a `doc.go` stating its responsibility and what it must not
   do.
-- Third-party dependencies are added when first used. Bubble Tea is added with
-  `go get github.com/charmbracelet/bubbletea` when work on `ui` begins.
+- Third-party dependencies are added when first used. The `ui` package pulls
+  in `charmbracelet/bubbletea`, `charmbracelet/lipgloss` and
+  `charmbracelet/bubbles`; nothing outside `ui` may import them.
