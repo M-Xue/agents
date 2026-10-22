@@ -4,14 +4,33 @@ skill-selector is a terminal UI for discovering agent skill directories and
 linking them into place. The code is split into four packages with a strict
 one-way dependency flow.
 
+## Building and installing
+
+The `main` package lives at the module root, so a plain `go build` in this
+directory produces `./skill-selector-app`. For day-to-day use run the
+installer instead, which builds the binary to `~/.local/bin/skill-selector`
+(honouring `$BIN_DIR`) and compiles in the path of the workspace this checkout
+belongs to, so the command works from any directory:
+
+```
+sh scripts/install.sh
+sh scripts/uninstall.sh
+```
+
+The compiled-in path is only a fallback: an explicit `-root` wins, then a
+workspace found above the current directory, then the installer's path. The
+scripts are described for users in the workspace README.
+
 ## Layout
 
 ```
 skill-selector-app/
 ├── go.mod                      module github.com/maxx/skill-selector-app
 ├── .gitignore
-├── cmd/skill-selector/
-│   └── main.go                 entry point: finds the workspace, wires packages together
+├── main.go                     entry point: finds the workspace, wires packages together
+├── scripts/
+│   ├── install.sh              build to $BIN_DIR with the workspace path compiled in
+│   └── uninstall.sh            remove that binary
 └── internal/
     ├── ui/                     Bubble Tea TUI (model, update, view)
     │   ├── doc.go
@@ -51,13 +70,15 @@ skill-selector-app/
 
 ## Packages
 
-### `cmd/skill-selector`
+### `main` (module root)
 
-The `main` package. It locates the agents workspace, constructs the
+The `main` package, in `main.go` at the module root so `go build` here
+produces the executable. It locates the agents workspace, constructs the
 `app.App`, builds the `ui.Model` and starts the Bubble Tea program. The
-workspace root is taken from the `-root` flag or, by default, found with
-`skills.FindRoot` by walking up from the current directory, so the binary can
-be run from anywhere inside the repo.
+workspace root is taken from the `-root` flag, else found with
+`skills.FindRoot` by walking up from the current directory, else taken from
+`defaultRoot`, a variable the installer sets with `-ldflags -X` so the
+installed binary can be run from anywhere.
 
 ### `internal/ui`
 
@@ -268,7 +289,7 @@ No business logic lives here.
 ## Dependency direction
 
 ```
-cmd/skill-selector
+     main
        │
        ▼
       ui ──▶ app ──▶ skills ──▶ files
@@ -278,8 +299,8 @@ cmd/skill-selector
 
 Dependencies only point downward. `files` imports nothing from the project,
 `skills` imports `files`, `app` imports `skills` and `files`, and `ui`
-imports only `app`. `cmd/skill-selector` imports `skills` as well as `app`
-and `ui` because it builds the `skills.Repo` the app is given. Nothing
+imports only `app`. `main` imports `skills` as well as `app` and `ui`
+because it builds the `skills.Repo` the app is given. Nothing
 imports `ui`.
 
 ## Conventions

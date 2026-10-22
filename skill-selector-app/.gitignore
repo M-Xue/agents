@@ -1,2 +1,4 @@
+# Built executable from a plain `go build` here. The installer builds
+# straight into $BIN_DIR, so it leaves nothing behind in the repo.
+/skill-selector-app
 /skill-selector
-/bin/

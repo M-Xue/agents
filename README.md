@@ -51,5 +51,47 @@ same name.
 
 Once the libraries are installed, use the skill selector, a Go TUI in
 `skill-selector-app/`, to choose which skills are exposed to the agent at any
-given time. Selected skills are exposed via symlinks, so toggling a skill on or
-off only adds or removes a link rather than copying files.
+given time. Selected skills are exposed via symlinks into `skills/`, so
+toggling a skill on or off only adds or removes a link rather than copying
+files. See [Installing the skill selector](#installing-the-skill-selector)
+to set it up, then run `skill-selector` from anywhere.
+
+## Installing the skill selector
+
+Requirements:
+
+- Go 1.27+
+
+The installer builds the binary and places it on your path. It locates this
+repo itself, so you can run it from any directory:
+
+```bash
+sh skill-selector-app/scripts/install.sh
+```
+
+This builds `skill-selector` and installs it to `~/.local/bin/skill-selector`
+(honoring `$BIN_DIR`). The path of this workspace is compiled into the binary,
+so `skill-selector` finds the right `skills/` and `third-party-skills/`
+directories no matter where you run it from. If `~/.local/bin` is not already
+on your `PATH`, the script tells you the line to add to your shell startup
+file.
+
+When started inside a different checkout of this repo, the selector prefers
+that checkout over the compiled-in one, and `skill-selector -root <path>`
+overrides both.
+
+### Updating
+
+Re-run the installer after pulling a new version. It rebuilds into the same
+location and is idempotent.
+
+### Uninstall
+
+```bash
+sh skill-selector-app/scripts/uninstall.sh
+```
+
+This removes the binary `install.sh` created. It honors the same `$BIN_DIR`
+override, so export it again here if you set it at install time. The symlinks
+in `skills/` are your selection, not part of the program, and are left in
+place; remove them with the selector itself or by hand.

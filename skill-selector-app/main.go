@@ -1,4 +1,5 @@
-// Command skill-selector is the entry point for the TUI.
+// Command skill-selector-app is the entry point for the TUI; build it with
+// go build in this directory, or install it with scripts/install.sh.
 // It locates the agents workspace, constructs the app and starts the UI.
 package main
 
@@ -15,8 +16,14 @@ import (
 	"github.com/maxx/skill-selector-app/internal/ui"
 )
 
+// defaultRoot is the workspace to fall back on when none is found above the
+// current directory. scripts/install.sh sets it at build time with
+// -ldflags "-X main.defaultRoot=<path>" so the installed command works from
+// anywhere; a plain go build leaves it empty.
+var defaultRoot string
+
 func main() {
-	root := flag.String("root", "", "agents workspace root (default: found by walking up from the current directory)")
+	root := flag.String("root", "", "agents workspace root (default: found by walking up from the current directory, then the path compiled in by the installer)")
 	flag.Parse()
 
 	repo, err := locate(*root)
@@ -32,8 +39,9 @@ func main() {
 	}
 }
 
-// locate returns the workspace at root, or searches upward from the current
-// directory when root is empty.
+// locate returns the workspace to operate on, in order of preference: the
+// explicit root, the workspace found above the current directory, then the
+// one compiled in by the installer.
 func locate(root string) (skills.Repo, error) {
 	if root != "" {
 		abs, err := filepath.Abs(root)
@@ -46,7 +54,14 @@ func locate(root string) (skills.Repo, error) {
 	if err != nil {
 		return skills.Repo{}, err
 	}
-	return skills.FindRoot(cwd)
+	repo, err := skills.FindRoot(cwd)
+	if err == nil {
+		return repo, nil
+	}
+	if defaultRoot != "" {
+		return skills.Repo{Root: defaultRoot}, nil
+	}
+	return skills.Repo{}, err
 }
 
 func fail(err error) {
