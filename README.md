@@ -63,6 +63,9 @@ to set it up, then run `skills` from anywhere.
 Requirements:
 
 - Go 1.27+
+- A [Nerd Font](https://www.nerdfonts.com/) compatible terminal font. The
+  checkbox icons in the Skills panel are Nerd Font glyphs and render as
+  blank or placeholder boxes without one.
 
 The installer builds the binary and places it on your path. It locates this
 repo itself, so you can run it from any directory:
