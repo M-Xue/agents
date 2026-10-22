@@ -16,13 +16,15 @@ as a local library to pull skills from rather than something committed to this
 repo. Run `update_third_party_skills.sh` to pull the latest changes for every
 cloned library.
 
-Currently installed libraries:
+### Adding new skill libraries
 
-- [pstack](https://github.com/backnotprop/pstack) (backnotprop)
-- [skills](https://github.com/mattpocock/skills) (mattpocock)
-- [agent-skills](https://github.com/addyosmani/agent-skills) (addyosmani)
-- [ponytail](https://github.com/DietrichGebert/ponytail) (DietrichGebert)
-- [superpowers](https://github.com/obra/superpowers) (obra)
+A skill library is a git repository with a `skills/` folder at the root of the
+directory. To add a library, add a `git clone` line to
+`install_third_party_skills.sh` in the following structure:
+
+```sh
+git clone <repository url> third-party-skills/<name of library>
+```
 
 ### Expected layout
 
@@ -30,7 +32,7 @@ The skill selector expects every library to keep its skills in a flat
 `skills/` directory at the library root, one subdirectory per skill, each
 containing a `SKILL.md`:
 
-```
+```txt
 <library>/
 └── skills/
     ├── skill-a/
