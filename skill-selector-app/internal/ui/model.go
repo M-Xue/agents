@@ -63,13 +63,21 @@ type Model struct {
 	// Skills panel: a checklist with its own search.
 	search searchbar.Model
 	skills checklist.Model
+	// libraryID is the library whose skills are loaded, so moving the
+	// library cursor only reloads when it lands on a different library.
+	libraryID string
 	// Details panel: the selected skill's file, rendered from markdown at
-	// detailsWidth. detailsSrc is kept so a resize can re-render.
+	// detailsWidth. detailsSrc is kept so a resize can re-render and
+	// detailsID so moving within the list only re-reads on a new skill.
 	details      fileview.Model
+	detailsID    string
 	detailsSrc   string
 	detailsWidth int
-	help         help.Model
-	keys         keyMap
+	// status is an error from the last action, shown in the footer in place
+	// of the help until the next key.
+	status string
+	help   help.Model
+	keys   keyMap
 }
 
 // New returns a Model ready to be passed to tea.NewProgram.
@@ -91,21 +99,44 @@ func New(application *app.App) *Model {
 	}
 	m.setFocus(panelLibraries)
 	m.syncLibraries()
-	m.syncSkills()
-	m.syncDetails()
 	return m
 }
 
-// syncDetails loads the file for the skill under the cursor and renders it
-// into the details viewer at the last known width.
+// syncDetails shows the file of the skill under the Skills cursor. It only
+// re-reads and rewinds when the cursor has moved to a different skill, so
+// re-filtering that leaves the cursor in place keeps the reader's position.
 func (m *Model) syncDetails() {
 	id := ""
 	if sel, ok := m.skills.Selected(); ok {
 		id = sel.ID
 	}
+	if id == m.detailsID && m.detailsSrc != "" {
+		return
+	}
+	m.detailsID = id
 	m.detailsSrc = m.app.SkillFile(id)
 	m.renderDetails()
 	m.details.ScrollToTop()
+}
+
+// syncLibrary makes the library under the Skill Libraries cursor current in
+// the app and rebuilds the Skills panel from it. The checklist snaps to its
+// first row because no skill ID from the old library survives, which is how
+// the first skill of a newly chosen library ends up selected. It is a no-op
+// when the cursor is still on the same library.
+func (m *Model) syncLibrary() {
+	id := ""
+	if sel, ok := m.libraries.Selected(); ok {
+		id = sel.ID
+	}
+	if id == m.libraryID && m.skills.Len() > 0 {
+		return
+	}
+	m.libraryID = id
+	if err := m.app.SelectLibrary(id); err != nil {
+		m.status = err.Error()
+	}
+	m.syncSkills()
 }
 
 // renderDetails pipes the markdown source through the markdown component at
@@ -125,6 +156,7 @@ func (m *Model) syncLibraries() {
 	match := fuzzy.Predicate(m.libSearch.Value())
 	items = fuzzy.Filter(items, func(it list.Item) bool { return match(it.Label) })
 	m.libraries.SetItems(items)
+	m.syncLibrary()
 }
 
 // syncSkills rebuilds the checklist rows: app state is mapped to items, then
@@ -141,6 +173,7 @@ func (m *Model) syncSkills() {
 	match := fuzzy.Predicate(m.search.Value())
 	items = fuzzy.Filter(items, func(it checklist.Item) bool { return match(it.Label) })
 	m.skills.SetItems(items)
+	m.syncDetails()
 }
 
 func (m *Model) Init() tea.Cmd { return nil }
@@ -152,6 +185,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 	case tea.KeyMsg:
+		m.status = ""
 		switch {
 		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
@@ -195,13 +229,16 @@ func (m *Model) setFocus(id panelID) {
 }
 
 // updateLibraries handles keys while the Skill Libraries panel has focus.
-// Arrows move the cursor; everything else goes to the search bar.
+// Arrows move the cursor and load that library's skills; everything else
+// goes to the search bar, which re-filters and may land on a new library.
 func (m *Model) updateLibraries(msg tea.KeyMsg) {
 	switch {
 	case key.Matches(msg, m.keys.Up):
 		m.libraries.MoveUp()
+		m.syncLibrary()
 	case key.Matches(msg, m.keys.Down):
 		m.libraries.MoveDown()
+		m.syncLibrary()
 	default:
 		if m.libSearch.Update(msg) {
 			m.syncLibraries()
@@ -209,18 +246,23 @@ func (m *Model) updateLibraries(msg tea.KeyMsg) {
 	}
 }
 
-// updateSkills handles keys while the Skills panel has focus. Arrows and
-// enter drive the list; everything else goes to the search bar, and any key
-// it consumes re-runs the filter.
+// updateSkills handles keys while the Skills panel has focus. Arrows move
+// the cursor and show that skill's file; enter toggles the link for the
+// skill under the cursor, reporting a failure in the footer; everything else
+// goes to the search bar, and any key it consumes re-runs the filter.
 func (m *Model) updateSkills(msg tea.KeyMsg) {
 	switch {
 	case key.Matches(msg, m.keys.Up):
 		m.skills.MoveUp()
+		m.syncDetails()
 	case key.Matches(msg, m.keys.Down):
 		m.skills.MoveDown()
+		m.syncDetails()
 	case key.Matches(msg, m.keys.Toggle):
 		if sel, ok := m.skills.Selected(); ok {
-			m.app.ToggleSkill(sel.ID)
+			if err := m.app.ToggleSkill(sel.ID); err != nil {
+				m.status = err.Error()
+			}
 			m.syncSkills()
 		}
 	default:
@@ -278,6 +320,9 @@ func (m *Model) View() string {
 
 	m.help.Width = contentWidth
 	footer := m.help.ShortHelpView(m.keys.ShortHelp())
+	if m.status != "" {
+		footer = lipgloss.NewStyle().Foreground(theme.Error).Render(m.status)
+	}
 	return frame(body, footer, m.width, m.height)
 }
 
@@ -301,6 +346,10 @@ func (m *Model) skillsContent(p *panel.Model) string {
 // file viewer filling the rest. Markdown is wrapped by the renderer, so a
 // width change re-renders rather than letting the viewer re-wrap.
 func (m *Model) detailsContent(p *panel.Model) string {
+	if m.detailsID == "" {
+		empty := lipgloss.NewStyle().Foreground(theme.TextInactive).Render("No skill selected")
+		return strings.Repeat("\n", listTopPadding) + empty
+	}
 	if w := p.InnerWidth(); w != m.detailsWidth {
 		m.detailsWidth = w
 		m.renderDetails()

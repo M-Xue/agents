@@ -11,7 +11,7 @@ skill-selector-app/
 ├── go.mod                      module github.com/maxx/skill-selector-app
 ├── .gitignore
 ├── cmd/skill-selector/
-│   └── main.go                 entry point, wires packages together
+│   └── main.go                 entry point: finds the workspace, wires packages together
 └── internal/
     ├── ui/                     Bubble Tea TUI (model, update, view)
     │   ├── doc.go
@@ -38,11 +38,10 @@ skill-selector-app/
     │   └── fuzzy.go
     ├── app/                    general business logic, coordinates skills + files
     │   ├── doc.go
-    │   ├── app.go              App struct, New()
-    │   └── dummy/              embedded placeholder SKILL.md for the details panel
-    ├── skills/                 processes agent skill directories
+    │   └── app.go              App: libraries, skills of the current library, toggle links
+    ├── skills/                 describes the workspace layout
     │   ├── doc.go
-    │   └── skill.go            Skill struct
+    │   └── skill.go            Repo: FindRoot, ExposedDir, LibrariesDir, LibrarySkillsDir, SkillFile
     └── files/                  filesystem access only, no business logic
         ├── doc.go
         ├── read.go             Read(path)
@@ -54,8 +53,11 @@ skill-selector-app/
 
 ### `cmd/skill-selector`
 
-The `main` package. It constructs the `app.App`, builds the `ui.Model` and
-starts the Bubble Tea program. It contains no logic of its own.
+The `main` package. It locates the agents workspace, constructs the
+`app.App`, builds the `ui.Model` and starts the Bubble Tea program. The
+workspace root is taken from the `-root` flag or, by default, found with
+`skills.FindRoot` by walking up from the current directory, so the binary can
+be run from anywhere inside the repo.
 
 ### `internal/ui`
 
@@ -103,45 +105,62 @@ split into two subpackages so screens stay free of styling detail:
   margin removed, since the panel already pads its interior. Code fences are
   syntax-highlighted by Chroma through Glamour.
 
-The Details panel shows the file for the skill under the Skills cursor via
-`app.SkillFile`, which for now returns an embedded placeholder. The source
-is piped through `markdown.Render` at the panel's inner width and the result
-handed to `fileview`; the two components never see each other. Because
-Glamour wraps at render time, the root model re-renders when the panel width
-changes rather than letting the viewer re-wrap styled text. Arrows scroll it
-while the panel has focus.
+The Details panel shows the `SKILL.md` of the skill under the Skills cursor
+via `app.SkillFile`. The source is piped through `markdown.Render` at the
+panel's inner width and the result handed to `fileview`; the two components
+never see each other. Because Glamour wraps at render time, the root model
+re-renders when the panel width changes rather than letting the viewer
+re-wrap styled text. Arrows scroll it while the panel has focus. When no
+skill is under the cursor the panel shows a muted "No skill selected".
 
-#### Search and list pipeline
+#### Panel pipeline
 
-The search bar and the checklist are fully decoupled: neither imports or
-references the other. The root model joins them in one function,
-`syncSkills`, which runs on every consumed keystroke and every toggle:
+The three panels form a chain: the library under the left cursor decides
+which skills are listed, and the skill under the middle cursor decides which
+file is shown. The components never see each other; the root model joins
+them in three sync functions that each call the next:
 
 ```
-app.Skills()  →  map to checklist.Item  →  fuzzy.Filter(fuzzy.Predicate(search.Value()))  →  checklist.SetItems
+syncLibraries: app.Libraries() → list.Item → fuzzy.Filter(libSearch) → list.SetItems → syncLibrary
+syncLibrary:   library under cursor → app.SelectLibrary → syncSkills
+syncSkills:    app.Skills() → checklist.Item{Checked: app.IsSelected} → fuzzy.Filter(search) → checklist.SetItems → syncDetails
+syncDetails:   skill under cursor → app.SkillFile → markdown.Render → fileview.SetContent
 ```
+
+`syncLibrary` is a no-op while the cursor stays on the same library, and
+`syncDetails` only re-reads and rewinds when the cursor lands on a different
+skill, so a toggle or a re-filter that leaves the cursor in place keeps the
+reader's scroll position. Because skill IDs are directory paths, none of the
+old library's IDs survive a library change, so the checklist snaps to its
+first row: the first skill of a newly chosen library is selected
+automatically and its file appears in Details.
 
 `internal/fuzzy` is a pure utility with no UI or app knowledge. `Match` is a
 case-insensitive subsequence test that ignores spaces in the query, so
 "code rev" matches "code-review". `Filter` is a generic order-preserving
 filter over any slice.
 
-Selection behaviour across filter changes is owned by the checklist:
+Selection behaviour across filter changes is owned by the list components:
 `SetItems` keeps the cursor on the row with the same ID when it is still
 present, and snaps to the top row (scrolling back to the start) when it has
 been filtered out.
 
-Key routing while the Skills panel has focus: up and down move the cursor,
-enter toggles the row under the cursor via `app.ToggleSkill`, and every other
-key goes to the search bar. Because letters and space type into the search,
-quit is ctrl+c only and there are no j/k aliases.
+Key routing while the Skill Libraries panel has focus: up and down move the
+cursor and run `syncLibrary`; every other key goes to that panel's search
+bar, and a consumed key re-runs `syncLibraries`. While the Skills panel has
+focus: up and down move the cursor and run `syncDetails`, enter toggles the
+row under the cursor via `app.ToggleSkill` and re-runs `syncSkills`, and
+every other key goes to the search bar. Because letters and space type into
+the search, quit is ctrl+c only and there are no j/k aliases.
 
-The Skill Libraries panel uses the same shape with the plain `list`
-component and its own search bar: `app.Libraries()` is mapped to list items
-and filtered by that panel's search value in `syncLibraries`. Both panels
-share one layout helper, `searchPanelContent`, that stacks the top padding,
-the labelled search row, a blank row and the list body. Each search bar is
-focused only while its panel is.
+When `app.ToggleSkill` or `app.SelectLibrary` returns an error, its message
+is shown in the footer row in `theme.Error` in place of the help until the
+next key. The usual cause is a name clash: two libraries each have a skill
+of the same name and one is already exposed.
+
+Both search panels share one layout helper, `searchPanelContent`, that
+stacks the top padding, the labelled search row, a blank row and the list
+body. Each search bar is focused only while its panel is.
 
 #### Component rules
 
@@ -173,21 +192,47 @@ focus between them; the focused panel takes the active border colour. The footer
 
 ### `internal/app`
 
-General business logic. It coordinates the `skills` and `files` packages and
-exposes the operations the UI needs. It knows nothing about the terminal and
-can be driven from tests or a future CLI without changes.
+General business logic. It is the only package that joins `skills` (where
+things live) with `files` (how to touch them), and it exposes the operations
+the UI needs. It knows nothing about the terminal and can be driven from
+tests or a future CLI without changes.
 
-Selection state lives here, not in the UI. The checklist component reports
-which row is under the cursor; `app.ToggleSkill` flips the selection and the
-UI re-reads `app.Skills` plus `app.IsSelected` to rebuild the rows. The
-current skill and library lists are hard-coded placeholder data to be
-replaced once the `skills` package discovers real directories.
+- `New(repo)` lists the subdirectories of `repo.LibrariesDir()` once; each
+  is a `Library` whose ID is its path and whose label is its name.
+- `SelectLibrary(id)` lists the subdirectories of that library's skills
+  directory; each is a `Skill` whose ID is its path. An unknown or empty ID
+  clears the list. A library with no skills directory yields an empty list
+  and an error for the UI to report.
+- `IsSelected(id)` asks `files.IsLinked` whether the skill is linked into
+  `repo.ExposedDir()`. It is read from disk on every call, so links made or
+  removed outside the program are reflected immediately.
+- `ToggleSkill(id)` links the skill into the exposed directory if it is not
+  linked and unlinks it if it is. A failure, such as a name clash with an
+  already exposed skill from another library, is returned as an error; the
+  existing link is never replaced.
+- `SkillFile(id)` reads the skill's `SKILL.md`. If it cannot be read the
+  returned text says so, so the details panel always has content.
+
+Selection state is not stored anywhere: the symlinks in the exposed
+directory are the state.
 
 ### `internal/skills`
 
-Processes agent skill directories. A skill is a directory containing a
-`SKILL.md` and supporting files. This package discovers, parses and describes
-skills. It does not touch the filesystem directly; it relies on `files`.
+Describes the layout of the agents workspace and nothing more. `Repo{Root}`
+builds every path the program needs:
+
+| Method | Path |
+|---|---|
+| `ExposedDir()` | `<root>/skills`, the directory the agent reads; selected skills are linked here |
+| `LibrariesDir()` | `<root>/third-party-skills`, one cloned library per subdirectory |
+| `LibrarySkillsDir(lib)` | `<lib>/skills`, the flat directory of skills in a library |
+| `SkillFile(skill)` | `<skill>/SKILL.md` |
+
+`FindRoot(start)` walks up from `start` to the first directory containing
+both `skills/` and `skill-selector-app/`. Those are the markers because they
+are committed; `third-party-skills/` is gitignored and absent on a fresh
+clone. It uses `files.ListDirs` for the check so the package still touches
+the filesystem only through `files`.
 
 ### `internal/files`
 
@@ -232,14 +277,14 @@ cmd/skill-selector
 ```
 
 Dependencies only point downward. `files` imports nothing from the project,
-`skills` may import `files`, `app` may import `skills` and `files`, and `ui`
-imports only `app`. Nothing imports `ui`.
+`skills` imports `files`, `app` imports `skills` and `files`, and `ui`
+imports only `app`. `cmd/skill-selector` imports `skills` as well as `app`
+and `ui` because it builds the `skills.Repo` the app is given. Nothing
+imports `ui`.
 
 ## Conventions
 
 - Packages live under `internal/` so they cannot be imported by other modules.
-- Unimplemented functions panic with `not implemented` rather than returning
-  zero values, so an accidental call fails loudly.
 - Each package has a `doc.go` stating its responsibility and what it must not
   do.
 - Third-party dependencies are added when first used. The `ui` package pulls

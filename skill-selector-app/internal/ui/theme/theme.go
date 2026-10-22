@@ -16,4 +16,6 @@ var (
 	// border color, with dark text.
 	TitleFg = lipgloss.Color("235")
 	TitleBg = lipgloss.Color("111")
+	// Error colours a failure message shown in place of the help footer.
+	Error = lipgloss.Color("203")
 )
