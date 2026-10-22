@@ -67,3 +67,22 @@ func TestViewGlyphsAndHeight(t *testing.T) {
 		t.Fatalf("glyphs wrong:\n%s", m.View())
 	}
 }
+
+func TestSetItemsFallsBackToTopWhenCursorRemoved(t *testing.T) {
+	m := New()
+	m.SetItems(items(10))
+	m.SetSize(20, 3)
+	for i := 0; i < 7; i++ {
+		m.MoveDown()
+	}
+	if m.offset == 0 {
+		t.Fatal("expected list to have scrolled")
+	}
+	// Filter out the cursor row (id 7); the cursor should snap to the top row
+	// and the window should scroll back with it.
+	m.SetItems([]Item{{ID: "1", Label: "one"}, {ID: "4", Label: "four"}})
+	sel, ok := m.Selected()
+	if !ok || sel.ID != "1" || m.offset != 0 {
+		t.Fatalf("got id=%q offset=%d", sel.ID, m.offset)
+	}
+}

@@ -24,8 +24,12 @@ skill-selector-app/
     │       ├── doc.go          the component rules
     │       ├── panel/
     │       │   └── panel.go    titled sharp-cornered box: New(title, w, h), View(content)
-    │       └── checklist/
-    │           └── checklist.go scrollable checked/clear list with cursor
+    │       ├── checklist/
+    │       │   └── checklist.go scrollable checked/clear list with cursor
+    │       └── searchbar/
+    │           └── searchbar.go single-line text field with block caret
+    ├── fuzzy/                  pure utility: Match predicate and generic Filter
+    │   └── fuzzy.go
     ├── app/                    general business logic, coordinates skills + files
     │   ├── doc.go
     │   └── app.go              App struct, New()
@@ -68,6 +72,37 @@ split into two subpackages so screens stay free of styling detail:
   glyphs), the cursor row is bold. The component owns the cursor and scroll
   offset and wraps at both ends; checked state is passed in by the caller
   and never mutated by the component.
+
+- `ui/component/searchbar` is a single-line text field on a dark background
+  with a block caret, ported from grove's text input. It owns the typed value
+  and caret position only. Printable characters, space, backspace, delete,
+  arrows, home and end are consumed; enter, up, down and tab are left for the
+  caller. It knows nothing about what the text is used for.
+
+#### Search and list pipeline
+
+The search bar and the checklist are fully decoupled: neither imports or
+references the other. The root model joins them in one function,
+`syncSkills`, which runs on every consumed keystroke and every toggle:
+
+```
+app.Skills()  →  map to checklist.Item  →  fuzzy.Filter(fuzzy.Predicate(search.Value()))  →  checklist.SetItems
+```
+
+`internal/fuzzy` is a pure utility with no UI or app knowledge. `Match` is a
+case-insensitive subsequence test that ignores spaces in the query, so
+"code rev" matches "code-review". `Filter` is a generic order-preserving
+filter over any slice.
+
+Selection behaviour across filter changes is owned by the checklist:
+`SetItems` keeps the cursor on the row with the same ID when it is still
+present, and snaps to the top row (scrolling back to the start) when it has
+been filtered out.
+
+Key routing while the Skills panel has focus: up and down move the cursor,
+enter toggles the row under the cursor via `app.ToggleSkill`, and every other
+key goes to the search bar. Because letters and space type into the search,
+quit is ctrl+c only and there are no j/k aliases.
 
 #### Component rules
 

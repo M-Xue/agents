@@ -14,12 +14,14 @@ type keyMap struct {
 
 func defaultKeyMap() keyMap {
 	return keyMap{
-		Up:        key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
-		Down:      key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
-		Toggle:    key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "toggle")),
+		// Letters, space and j/k are reserved for typing into the search bar,
+		// so navigation uses arrows, toggle uses enter and quit uses ctrl+c.
+		Up:        key.NewBinding(key.WithKeys("up"), key.WithHelp("↑", "up")),
+		Down:      key.NewBinding(key.WithKeys("down"), key.WithHelp("↓", "down")),
+		Toggle:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "toggle")),
 		NextPanel: key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next panel")),
 		PrevPanel: key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "prev panel")),
-		Quit:      key.NewBinding(key.WithKeys("ctrl+c", "q"), key.WithHelp("q", "quit")),
+		Quit:      key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
 	}
 }
 
