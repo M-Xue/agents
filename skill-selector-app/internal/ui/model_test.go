@@ -187,3 +187,76 @@ func TestClickFocusesPanel(t *testing.T) {
 		t.Fatal("non-left-press mouse event changed focus")
 	}
 }
+
+// footer returns the last non-blank line of the rendered screen.
+func footer(m *Model) string {
+	lines := strings.Split(view(m), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.TrimSpace(lines[i]) != "" {
+			return lines[i]
+		}
+	}
+	return ""
+}
+
+func TestHelpFollowsFocus(t *testing.T) {
+	m, _ := newModel(t)
+	common := []string{"↑/k up", "↓/j down", "next panel", "prev panel", "esc quit"}
+	for _, p := range []panelID{panelLibraries, panelSkills, panelDetails} {
+		m.setFocus(p)
+		f := footer(m)
+		for _, w := range common {
+			if !strings.Contains(f, w) {
+				t.Errorf("panel %d footer %q missing %q", p, f, w)
+			}
+		}
+		hasToggle := strings.Contains(f, "toggle")
+		if hasToggle != (p == panelSkills) {
+			t.Errorf("panel %d footer %q: toggle shown = %v", p, f, hasToggle)
+		}
+	}
+	m.setFocus(panelSkills)
+	if f := footer(m); !strings.HasSuffix(strings.TrimRight(f, " "), "enter toggle") {
+		t.Errorf("toggle is not last in %q", f)
+	}
+}
+
+func TestVimKeysAndEsc(t *testing.T) {
+	m, _ := newModel(t)
+	typed := func(r rune) { m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}) }
+
+	typed('j') // libraries: alpha -> beta
+	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") {
+		t.Fatal("j did not move the library cursor")
+	}
+	typed('k') // back to alpha
+	if v := view(m); !strings.Contains(v, "APPLE SKILL BODY") {
+		t.Fatal("k did not move the library cursor")
+	}
+	if m.libSearch.Value() != "" {
+		t.Fatalf("j/k leaked into the search: %q", m.libSearch.Value())
+	}
+
+	press(m, tea.KeyTab) // skills
+	typed('j')
+	if v := view(m); !strings.Contains(v, "BANANA SKILL BODY") {
+		t.Fatal("j did not move the skill cursor")
+	}
+
+	press(m, tea.KeyTab) // details
+	before := m.details.Offset()
+	typed('j')
+	typed('k')
+	if m.details.Offset() != before {
+		t.Fatal("j then k did not return the details scroll to its start")
+	}
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("esc did not produce a quit command")
+	}
+	_, cmd = m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if cmd == nil {
+		t.Fatal("ctrl+c no longer quits")
+	}
+}

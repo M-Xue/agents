@@ -36,7 +36,7 @@ skill-selector-app/
     │   ├── doc.go
     │   ├── model.go            root Model, Init/Update/View
     │   ├── layout.go           window frame: padding, footer rows, side-by-side panels
-    │   ├── keys.go             key bindings rendered in the help footer
+    │   ├── keys.go             key bindings; helpFor picks the footer hints per focused panel
     │   ├── theme/
     │   │   └── theme.go        shared chrome colours (borders, title tab)
     │   └── component/          independent presentation components, one per folder
@@ -171,8 +171,11 @@ cursor and run `syncLibrary`; every other key goes to that panel's search
 bar, and a consumed key re-runs `syncLibraries`. While the Skills panel has
 focus: up and down move the cursor and run `syncDetails`, enter toggles the
 row under the cursor via `app.ToggleSkill` and re-runs `syncSkills`, and
-every other key goes to the search bar. Because letters and space type into
-the search, quit is ctrl+c only and there are no j/k aliases.
+every other key goes to the search bar. Up and down also answer to k and j
+in every panel; they are matched before the search bar sees the key, so
+those two letters cannot be typed into a search. All other letters and space
+type into the search, which is why toggle is enter rather than space. Quit
+is esc or ctrl+c.
 
 When `app.ToggleSkill` or `app.SelectLibrary` returns an error, its message
 is shown in the footer row in `theme.Error` in place of the help until the
@@ -214,7 +217,9 @@ of the panel widths and height, used both to draw them and, in `panelAt`, to
 map a click to a panel, so the two cannot drift apart. Mouse reporting is
 enabled in `main` with `tea.WithMouseCellMotion`. Clicking is not listed in
 the help footer. The footer is rendered with
-`bubbles/help` in short mode from the bindings in `keys.go`.
+`bubbles/help` in short mode from `keyMap.helpFor(focused)` in `keys.go`, so
+every panel lists up, down, next panel, previous panel and quit, and Skills
+alone appends toggle at the end.
 
 ### `internal/app`
 

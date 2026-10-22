@@ -353,7 +353,7 @@ func (m *Model) View() string {
 	body := panel.Tab(appName) + strings.Repeat("\n", panelTopRows) + sideBySide(views, widths, panelHeight)
 
 	m.help.Width = contentWidth
-	footer := m.help.ShortHelpView(m.keys.ShortHelp())
+	footer := m.help.ShortHelpView(m.keys.helpFor(m.focused))
 	if m.status != "" {
 		footer = lipgloss.NewStyle().Foreground(theme.Error).Render(m.status)
 	}
