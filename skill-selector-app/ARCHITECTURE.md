@@ -30,8 +30,10 @@ skill-selector-app/
     │       │   └── checklist.go scrollable checked/clear list with cursor
     │       ├── searchbar/
     │       │   └── searchbar.go single-line text field with block caret
-    │       └── fileview/
-    │           └── fileview.go word-wrapped, vertically scrolling text viewer
+    │       ├── fileview/
+    │       │   └── fileview.go word-wrapped, vertically scrolling text viewer
+    │       └── markdown/
+    │           └── markdown.go Glamour renderer: markdown in, styled text out
     ├── fuzzy/                  pure utility: Match predicate and generic Filter
     │   └── fuzzy.go
     ├── app/                    general business logic, coordinates skills + files
@@ -92,9 +94,22 @@ split into two subpackages so screens stay free of styling detail:
   wrapped line, stopping at both ends rather than wrapping around. It owns
   the scroll offset and wrapped lines only.
 
+- `ui/component/markdown` is a stateless renderer built on Glamour. `Render`
+  takes markdown and a width and returns ANSI-styled text wrapped to that
+  width. A leading YAML frontmatter block is split off and drawn as a header
+  (name in the accent colour, description muted) instead of literal dashes
+  and key/value lines. The style starts from Glamour's dark theme with the
+  heading, rule and bullet colours taken from `ui/theme` and the document
+  margin removed, since the panel already pads its interior. Code fences are
+  syntax-highlighted by Chroma through Glamour.
+
 The Details panel shows the file for the skill under the Skills cursor via
-`app.SkillFile`, which for now returns an embedded placeholder. Arrows scroll
-it while the panel has focus.
+`app.SkillFile`, which for now returns an embedded placeholder. The source
+is piped through `markdown.Render` at the panel's inner width and the result
+handed to `fileview`; the two components never see each other. Because
+Glamour wraps at render time, the root model re-renders when the panel width
+changes rather than letting the viewer re-wrap styled text. Arrows scroll it
+while the panel has focus.
 
 #### Search and list pipeline
 
@@ -209,5 +224,6 @@ imports only `app`. Nothing imports `ui`.
 - Each package has a `doc.go` stating its responsibility and what it must not
   do.
 - Third-party dependencies are added when first used. The `ui` package pulls
-  in `charmbracelet/bubbletea`, `charmbracelet/lipgloss` and
-  `charmbracelet/bubbles`; nothing outside `ui` may import them.
+  in `charmbracelet/bubbletea`, `charmbracelet/lipgloss`,
+  `charmbracelet/bubbles` and `charmbracelet/glamour`; nothing outside `ui`
+  may import them.

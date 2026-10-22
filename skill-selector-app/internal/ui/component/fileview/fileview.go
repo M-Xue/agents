@@ -22,11 +22,17 @@ type Model struct {
 // New returns an empty viewer.
 func New() Model { return Model{} }
 
-// SetContent replaces the text and scrolls back to the top.
+// SetContent replaces the text. The scroll offset is kept (clamped to the
+// new length) so re-rendering the same document at a new width does not lose
+// the reader's place; call ScrollToTop when showing a different document.
 func (m *Model) SetContent(content string) {
 	m.content = content
-	m.offset = 0
 	m.rewrap()
+}
+
+// ScrollToTop moves the window back to the first line.
+func (m *Model) ScrollToTop() {
+	m.offset = 0
 }
 
 // SetSize sets the visible area in cells and re-wraps the text to the width.

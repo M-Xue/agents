@@ -13,6 +13,7 @@ import (
 	"github.com/maxx/skill-selector-app/internal/ui/component/checklist"
 	"github.com/maxx/skill-selector-app/internal/ui/component/fileview"
 	"github.com/maxx/skill-selector-app/internal/ui/component/list"
+	"github.com/maxx/skill-selector-app/internal/ui/component/markdown"
 	"github.com/maxx/skill-selector-app/internal/ui/component/panel"
 	"github.com/maxx/skill-selector-app/internal/ui/component/searchbar"
 	"github.com/maxx/skill-selector-app/internal/ui/theme"
@@ -62,10 +63,13 @@ type Model struct {
 	// Skills panel: a checklist with its own search.
 	search searchbar.Model
 	skills checklist.Model
-	// Details panel: the selected skill's file.
-	details fileview.Model
-	help    help.Model
-	keys    keyMap
+	// Details panel: the selected skill's file, rendered from markdown at
+	// detailsWidth. detailsSrc is kept so a resize can re-render.
+	details      fileview.Model
+	detailsSrc   string
+	detailsWidth int
+	help         help.Model
+	keys         keyMap
 }
 
 // New returns a Model ready to be passed to tea.NewProgram.
@@ -92,14 +96,22 @@ func New(application *app.App) *Model {
 	return m
 }
 
-// syncDetails loads the file for the skill under the cursor into the details
-// viewer.
+// syncDetails loads the file for the skill under the cursor and renders it
+// into the details viewer at the last known width.
 func (m *Model) syncDetails() {
 	id := ""
 	if sel, ok := m.skills.Selected(); ok {
 		id = sel.ID
 	}
-	m.details.SetContent(m.app.SkillFile(id))
+	m.detailsSrc = m.app.SkillFile(id)
+	m.renderDetails()
+	m.details.ScrollToTop()
+}
+
+// renderDetails pipes the markdown source through the markdown component at
+// the current details width and hands the styled text to the file viewer.
+func (m *Model) renderDetails() {
+	m.details.SetContent(markdown.Render(m.detailsSrc, m.detailsWidth))
 }
 
 // syncLibraries rebuilds the library rows from app state, piped through the
@@ -286,8 +298,13 @@ func (m *Model) skillsContent(p *panel.Model) string {
 }
 
 // detailsContent lays out the Details panel interior: a blank row, then the
-// file viewer filling the rest.
+// file viewer filling the rest. Markdown is wrapped by the renderer, so a
+// width change re-renders rather than letting the viewer re-wrap.
 func (m *Model) detailsContent(p *panel.Model) string {
+	if w := p.InnerWidth(); w != m.detailsWidth {
+		m.detailsWidth = w
+		m.renderDetails()
+	}
 	m.details.SetSize(p.InnerWidth(), max(0, p.InnerHeight()-listTopPadding))
 	return strings.Repeat("\n", listTopPadding) + m.details.View()
 }

@@ -41,3 +41,23 @@ func TestViewHeight(t *testing.T) {
 		t.Fatalf("got %d rows", n)
 	}
 }
+
+func TestSetContentKeepsOffset(t *testing.T) {
+	m := New()
+	m.SetContent("a\nb\nc\nd\ne\nf")
+	m.SetSize(5, 2)
+	m.ScrollDown()
+	m.ScrollDown()
+	m.SetContent("a\nb\nc\nd\ne\nf\ng")
+	if m.Offset() != 2 {
+		t.Fatalf("offset after SetContent = %d, want 2", m.Offset())
+	}
+	m.SetContent("a\nb")
+	if m.Offset() != 0 {
+		t.Fatalf("offset not clamped to shorter content: %d", m.Offset())
+	}
+	m.ScrollToTop()
+	if m.Offset() != 0 {
+		t.Fatal("ScrollToTop failed")
+	}
+}
