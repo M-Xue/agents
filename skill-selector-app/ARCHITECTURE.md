@@ -28,13 +28,16 @@ skill-selector-app/
     │       │   └── list.go     scrollable plain list with cursor
     │       ├── checklist/
     │       │   └── checklist.go scrollable checked/clear list with cursor
-    │       └── searchbar/
-    │           └── searchbar.go single-line text field with block caret
+    │       ├── searchbar/
+    │       │   └── searchbar.go single-line text field with block caret
+    │       └── fileview/
+    │           └── fileview.go word-wrapped, vertically scrolling text viewer
     ├── fuzzy/                  pure utility: Match predicate and generic Filter
     │   └── fuzzy.go
     ├── app/                    general business logic, coordinates skills + files
     │   ├── doc.go
-    │   └── app.go              App struct, New()
+    │   ├── app.go              App struct, New()
+    │   └── dummy/              embedded placeholder SKILL.md for the details panel
     ├── skills/                 processes agent skill directories
     │   ├── doc.go
     │   └── skill.go            Skill struct
@@ -83,6 +86,15 @@ split into two subpackages so screens stay free of styling detail:
   and caret position only. Printable characters, space, backspace, delete,
   arrows, home and end are consumed; enter, up, down and tab are left for the
   caller. It knows nothing about what the text is used for.
+
+- `ui/component/fileview` shows a block of text in a fixed area. Lines are
+  soft-wrapped to the width with lipgloss, and the view scrolls vertically by
+  wrapped line, stopping at both ends rather than wrapping around. It owns
+  the scroll offset and wrapped lines only.
+
+The Details panel shows the file for the skill under the Skills cursor via
+`app.SkillFile`, which for now returns an embedded placeholder. Arrows scroll
+it while the panel has focus.
 
 #### Search and list pipeline
 

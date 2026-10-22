@@ -1,6 +1,15 @@
 package app
 
-import "fmt"
+import (
+	_ "embed"
+	"fmt"
+)
+
+// dummySkillFile is a placeholder SKILL.md shown in the details panel until
+// the files package reads the selected skill from disk.
+//
+//go:embed dummy/grilling-SKILL.md
+var dummySkillFile string
 
 // dummySkillCount is how many placeholder skills dummySkills returns.
 const dummySkillCount = 80
@@ -42,6 +51,12 @@ func New() *App {
 // Libraries returns the known skill libraries in display order.
 func (a *App) Libraries() []Library {
 	return append([]Library(nil), a.libraries...)
+}
+
+// SkillFile returns the text of the skill file to show in the details panel.
+// Placeholder: it ignores id and always returns the embedded dummy file.
+func (a *App) SkillFile(id string) string {
+	return dummySkillFile
 }
 
 // Skills returns the known skills in display order.

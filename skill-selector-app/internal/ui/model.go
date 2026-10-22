@@ -11,6 +11,7 @@ import (
 	"github.com/maxx/skill-selector-app/internal/app"
 	"github.com/maxx/skill-selector-app/internal/fuzzy"
 	"github.com/maxx/skill-selector-app/internal/ui/component/checklist"
+	"github.com/maxx/skill-selector-app/internal/ui/component/fileview"
 	"github.com/maxx/skill-selector-app/internal/ui/component/list"
 	"github.com/maxx/skill-selector-app/internal/ui/component/panel"
 	"github.com/maxx/skill-selector-app/internal/ui/component/searchbar"
@@ -61,8 +62,10 @@ type Model struct {
 	// Skills panel: a checklist with its own search.
 	search searchbar.Model
 	skills checklist.Model
-	help   help.Model
-	keys   keyMap
+	// Details panel: the selected skill's file.
+	details fileview.Model
+	help    help.Model
+	keys    keyMap
 }
 
 // New returns a Model ready to be passed to tea.NewProgram.
@@ -77,6 +80,7 @@ func New(application *app.App) *Model {
 		libraries: list.New(),
 		search:    searchbar.New(""),
 		skills:    checklist.New(),
+		details:   fileview.New(),
 	}
 	for i := range m.panels {
 		m.panels[i] = panel.New(panelTitles[i], 0, 0)
@@ -84,7 +88,18 @@ func New(application *app.App) *Model {
 	m.setFocus(panelLibraries)
 	m.syncLibraries()
 	m.syncSkills()
+	m.syncDetails()
 	return m
+}
+
+// syncDetails loads the file for the skill under the cursor into the details
+// viewer.
+func (m *Model) syncDetails() {
+	id := ""
+	if sel, ok := m.skills.Selected(); ok {
+		id = sel.ID
+	}
+	m.details.SetContent(m.app.SkillFile(id))
 }
 
 // syncLibraries rebuilds the library rows from app state, piped through the
@@ -136,6 +151,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateLibraries(msg)
 		case m.focused == panelSkills:
 			m.updateSkills(msg)
+		case m.focused == panelDetails:
+			m.updateDetails(msg)
 		}
 	}
 	return m, nil
@@ -201,6 +218,17 @@ func (m *Model) updateSkills(msg tea.KeyMsg) {
 	}
 }
 
+// updateDetails handles keys while the Details panel has focus: arrows
+// scroll the file.
+func (m *Model) updateDetails(msg tea.KeyMsg) {
+	switch {
+	case key.Matches(msg, m.keys.Up):
+		m.details.ScrollUp()
+	case key.Matches(msg, m.keys.Down):
+		m.details.ScrollDown()
+	}
+}
+
 // searchLabel renders the caption beside the search field in the active
 // accent colour.
 func searchLabel(text string) string {
@@ -229,6 +257,8 @@ func (m *Model) View() string {
 			content = m.librariesContent(p)
 		case panelSkills:
 			content = m.skillsContent(p)
+		case panelDetails:
+			content = m.detailsContent(p)
 		}
 		views[i] = p.View(content)
 	}
@@ -253,6 +283,13 @@ func (m *Model) skillsContent(p *panel.Model) string {
 	listHeight := searchPanelListHeight(p)
 	m.skills.SetSize(p.InnerWidth(), listHeight)
 	return searchPanelContent(p, &m.search, m.skills.View())
+}
+
+// detailsContent lays out the Details panel interior: a blank row, then the
+// file viewer filling the rest.
+func (m *Model) detailsContent(p *panel.Model) string {
+	m.details.SetSize(p.InnerWidth(), max(0, p.InnerHeight()-listTopPadding))
+	return strings.Repeat("\n", listTopPadding) + m.details.View()
 }
 
 // searchPanelListHeight is the rows left for a list beneath a panel's top
