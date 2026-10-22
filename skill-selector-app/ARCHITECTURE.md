@@ -46,8 +46,8 @@ skill-selector-app/
     └── files/                  filesystem access only, no business logic
         ├── doc.go
         ├── read.go             Read(path)
-        ├── symlink.go          CreateSymlink, IsSymlink, IsSymlinkToDir
-        └── list.go             Entry struct, List(root)
+        ├── symlink.go          IsLinked, Link, Unlink
+        └── list.go             ListDirs(path)
 ```
 
 ## Packages
@@ -191,15 +191,34 @@ skills. It does not touch the filesystem directly; it relies on `files`.
 
 ### `internal/files`
 
-Thin wrapper over filesystem access:
+Thin wrapper over filesystem access. Its exported API is exactly five
+functions and nothing else; helpers stay unexported so callers never depend
+on how a check is performed:
 
-- reading files
-- creating symlinks
-- checking whether a path is a symlink, and whether it points at a directory
-- listing all files and directories beneath a given subfolder
+- `Read(path)` returns a file's contents as a string, ready to hand to the
+  `fileview` component.
+- `ListDirs(path)` returns the full path of every directory directly beneath
+  `path`, sorted by name. Symlinks that resolve to a directory count;
+  files and dangling links do not.
+- `IsLinked(dir, target)` reports whether `dir` holds a symlink to the
+  folder `target`.
+- `Link(dir, target)` creates that symlink, storing `target`'s absolute path.
+- `Unlink(dir, target)` removes it.
 
-No business logic lives here. Symlink checks use `os.Lstat` so that a link to
-a directory is reported as a link, not as a directory.
+Every symlink function uses the same convention: the link lives in `dir` and
+is named after the last path element of `target`, so linking
+`/lib/skills/code-review` into `/exposed` creates `/exposed/code-review`.
+Paths are compared after resolving to their canonical absolute form, so a
+relative `target` and its absolute spelling are treated as the same folder.
+
+The package is deliberately conservative about deleting. `Unlink` only
+removes an entry that is a symlink pointing at `target`; a real directory of
+the same name, or a link to somewhere else, is left in place and reported as
+an error. Unlinking something that is not there is a no-op. `Link` fails
+rather than overwriting an existing entry. Symlink checks use `os.Lstat` so a
+link to a directory is seen as a link, not as a directory.
+
+No business logic lives here.
 
 ## Dependency direction
 
