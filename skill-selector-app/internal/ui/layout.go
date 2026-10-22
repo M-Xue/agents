@@ -3,7 +3,7 @@ package ui
 import (
 	"strings"
 
-	"github.com/maxx/skill-selector-app/internal/ui/components/panel"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -29,9 +29,9 @@ func frame(body, footer string, width, height int) string {
 
 	lines := make([]string, 0, contentHeight)
 	lines = append(lines, fitBody(body, contentWidth, bodyHeight)...)
-	lines = append(lines, panel.Fit(footer, contentWidth))
+	lines = append(lines, fit(footer, contentWidth))
 	for len(lines) < contentHeight {
-		lines = append(lines, panel.Fit("", contentWidth))
+		lines = append(lines, fit("", contentWidth))
 	}
 	if len(lines) > contentHeight {
 		lines = lines[:contentHeight]
@@ -44,7 +44,7 @@ func frame(body, footer string, width, height int) string {
 	}
 	leftPad := strings.Repeat(" ", horizontalPadding)
 	for _, line := range lines {
-		padded = append(padded, leftPad+panel.Fit(line, contentWidth))
+		padded = append(padded, leftPad+fit(line, contentWidth))
 	}
 	for len(padded) < height {
 		padded = append(padded, blankLine)
@@ -74,7 +74,7 @@ func sideBySide(panels []string, widths []int, height int) string {
 				cell = lines[i]
 			}
 			if j < len(split)-1 {
-				cell = panel.Fit(cell, widths[j]) + gap
+				cell = fit(cell, widths[j]) + gap
 			}
 			row.WriteString(cell)
 		}
@@ -110,7 +110,7 @@ func fitBody(content string, width, height int) []string {
 		if i < len(lines) {
 			line = lines[i]
 		}
-		result = append(result, panel.Fit(line, width))
+		result = append(result, fit(line, width))
 	}
 	return result
 }
@@ -119,4 +119,16 @@ func fitBody(content string, width, height int) []string {
 // padding is removed from the window width.
 func contentWidthFor(windowWidth int) int {
 	return max(0, windowWidth-horizontalPadding*2)
+}
+
+// fit pads or truncates line to exactly width display cells, ANSI-aware.
+func fit(line string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	lineWidth := lipgloss.Width(line)
+	if lineWidth > width {
+		return lipgloss.NewStyle().MaxWidth(width).Render(line)
+	}
+	return line + strings.Repeat(" ", width-lineWidth)
 }

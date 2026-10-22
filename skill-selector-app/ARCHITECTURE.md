@@ -20,9 +20,10 @@ skill-selector-app/
     │   ├── keys.go             key bindings rendered in the help footer
     │   ├── theme/
     │   │   └── theme.go        shared chrome colours (borders, title tab)
-    │   └── components/
+    │   └── component/          independent presentation components, one per folder
+    │       ├── doc.go          the component rules
     │       └── panel/
-    │           └── panel.go    titled sharp-cornered box, Tab(), Render(), Fit()
+    │           └── panel.go    titled sharp-cornered box: New(title, w, h), View(content)
     ├── app/                    general business logic, coordinates skills + files
     │   ├── doc.go
     │   └── app.go              App struct, New()
@@ -55,11 +56,31 @@ split into two subpackages so screens stay free of styling detail:
 - `ui/theme` holds the colour palette. The active border and title tab are
   ANSI 111 (light blue), inactive borders are ANSI 60 (slate), tab text is
   ANSI 235 (near black).
-- `ui/components/panel` draws a lazygit-style pane: square corners, the title
+- `ui/component/panel` draws a lazygit-style pane: square corners, the title
   rendered as a bold highlighted tab embedded in the top border (`┌─ Title ──┐`),
   content padded one column from each side, always filled to the exact
   width and height requested. `panel.Tab` renders the standalone app title in
   the same style.
+
+#### Component rules
+
+Every folder under `ui/component` is one independent component. The rules
+are strict so components stay reusable and trivially testable:
+
+1. A component imports nothing from this project except `ui/theme`.
+2. A component never imports another component. If two need to share code,
+   that code is duplicated or lifted into the caller, not shared sideways.
+3. A component contains no business logic. It knows nothing about skills,
+   files, symlinks or the app's state.
+4. A component receives everything it needs as arguments. Width, height,
+   title, focus and content are computed by the caller and passed in. A
+   component never reads the terminal size or decides its own layout.
+5. A component follows the Bubble Tea shape where it has state: `New(...)`
+   constructor, setters, and a `View` that returns a string. Components with
+   no state are plain functions.
+
+The caller, usually a screen or the root model, owns layout: it decides how
+many columns each component gets and tells it.
 
 `layout.go` owns the window frame. The content area is inset 4 columns on the
 left and right and 2 rows on the top and bottom. Inside it, from top to

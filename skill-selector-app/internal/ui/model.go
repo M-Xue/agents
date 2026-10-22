@@ -5,7 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/maxx/skill-selector-app/internal/ui/components/panel"
+	"github.com/maxx/skill-selector-app/internal/ui/component/panel"
 )
 
 // appName is rendered as the title tab above the panels.
@@ -32,6 +32,7 @@ type Model struct {
 	width   int
 	height  int
 	focused panelID
+	panels  [panelCount]panel.Model
 	help    help.Model
 	keys    keyMap
 }
@@ -40,7 +41,11 @@ type Model struct {
 func New() *Model {
 	h := help.New()
 	h.ShowAll = false
-	return &Model{help: h, keys: defaultKeyMap()}
+	m := &Model{help: h, keys: defaultKeyMap()}
+	for i := range m.panels {
+		m.panels[i] = panel.New(panelTitles[i], 0, 0)
+	}
+	return m
 }
 
 func (m *Model) Init() tea.Cmd { return nil }
@@ -76,12 +81,18 @@ func (m *Model) View() string {
 	panelHeight := max(2, bodyHeight-2)
 	widths := splitWidths(contentWidth, panelRatios[:]...)
 
-	panels := make([]string, panelCount)
-	for i := range panels {
-		id := panelID(i)
-		panels[i] = panel.Render(panelTitles[id], "", widths[i], panelHeight, id == m.focused)
+	views := make([]string, panelCount)
+	for i := range m.panels {
+		p := &m.panels[i]
+		p.SetSize(widths[i], panelHeight)
+		if panelID(i) == m.focused {
+			p.Focus()
+		} else {
+			p.Blur()
+		}
+		views[i] = p.View("")
 	}
-	body := panel.Tab(appName) + "\n\n" + sideBySide(panels, widths, panelHeight)
+	body := panel.Tab(appName) + "\n\n" + sideBySide(views, widths, panelHeight)
 
 	m.help.Width = contentWidth
 	footer := m.help.ShortHelpView(m.keys.ShortHelp())
