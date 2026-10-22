@@ -88,26 +88,34 @@ func (a *App) IsSelected(id string) bool {
 	return err == nil && linked
 }
 
-// ToggleSkill exposes the skill with the given ID if it is not exposed, and
-// hides it if it is, by adding or removing its link in the exposed skills
-// directory. An error is returned when the link cannot be changed, for
-// example when another library's skill of the same name is already exposed.
-func (a *App) ToggleSkill(id string) error {
+// SetSelected exposes the skill with the given ID when selected is true and
+// hides it when false, by adding or removing its link in the exposed skills
+// directory. It is a no-op when the skill is already in the requested state.
+// An error is returned when the link cannot be changed, for example when
+// another library's skill of the same name is already exposed.
+func (a *App) SetSelected(id string, selected bool) error {
 	exposed := a.repo.ExposedDir()
 	linked, err := files.IsLinked(exposed, id)
 	if err != nil {
 		return fmt.Errorf("checking %s: %w", filepath.Base(id), err)
 	}
-	if linked {
+	switch {
+	case selected && !linked:
+		if err := files.Link(exposed, id); err != nil {
+			return fmt.Errorf("exposing %s: %w", filepath.Base(id), err)
+		}
+	case !selected && linked:
 		if err := files.Unlink(exposed, id); err != nil {
 			return fmt.Errorf("hiding %s: %w", filepath.Base(id), err)
 		}
-		return nil
-	}
-	if err := files.Link(exposed, id); err != nil {
-		return fmt.Errorf("exposing %s: %w", filepath.Base(id), err)
 	}
 	return nil
+}
+
+// ToggleSkill exposes the skill with the given ID if it is not exposed, and
+// hides it if it is.
+func (a *App) ToggleSkill(id string) error {
+	return a.SetSelected(id, !a.IsSelected(id))
 }
 
 // SkillFile returns the text of the main file of the skill with the given

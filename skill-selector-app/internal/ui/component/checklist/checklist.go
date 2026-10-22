@@ -93,6 +93,10 @@ func (m Model) Selected() (Item, bool) {
 // Len returns the number of items.
 func (m Model) Len() int { return len(m.items) }
 
+// Items returns a copy of the rows in display order, as last set with
+// SetItems, so the caller can act on exactly what is shown.
+func (m Model) Items() []Item { return append([]Item(nil), m.items...) }
+
 // clamp keeps the cursor in range and scrolls the window so the cursor is
 // visible, snapping the window to the list bounds.
 func (m *Model) clamp() {

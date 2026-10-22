@@ -86,3 +86,16 @@ func TestSetItemsFallsBackToTopWhenCursorRemoved(t *testing.T) {
 		t.Fatalf("got id=%q offset=%d", sel.ID, m.offset)
 	}
 }
+
+func TestItemsIsACopy(t *testing.T) {
+	m := New()
+	m.SetItems([]Item{{ID: "a"}, {ID: "b", Checked: true}})
+	got := m.Items()
+	if len(got) != 2 || got[1].ID != "b" || !got[1].Checked {
+		t.Fatalf("Items = %+v", got)
+	}
+	got[0].ID = "mutated"
+	if m.Items()[0].ID != "a" {
+		t.Fatal("Items returned the internal slice")
+	}
+}

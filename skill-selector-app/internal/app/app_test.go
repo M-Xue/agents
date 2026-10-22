@@ -138,3 +138,28 @@ func TestSkillFile(t *testing.T) {
 		t.Fatalf("SkillFile(\"\") = %q", got)
 	}
 }
+
+func TestSetSelectedIsIdempotent(t *testing.T) {
+	a, err := New(newWorkspace(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = a.SelectLibrary(a.Libraries()[0].ID)
+	id := a.Skills()[0].ID
+	for i := 0; i < 2; i++ {
+		if err := a.SetSelected(id, true); err != nil {
+			t.Fatalf("SetSelected(true) #%d: %v", i, err)
+		}
+		if !a.IsSelected(id) {
+			t.Fatal("not selected")
+		}
+	}
+	for i := 0; i < 2; i++ {
+		if err := a.SetSelected(id, false); err != nil {
+			t.Fatalf("SetSelected(false) #%d: %v", i, err)
+		}
+		if a.IsSelected(id) {
+			t.Fatal("still selected")
+		}
+	}
+}

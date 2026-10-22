@@ -216,8 +216,8 @@ func TestHelpFollowsFocus(t *testing.T) {
 		}
 	}
 	m.setFocus(panelSkills)
-	if f := footer(m); !strings.HasSuffix(strings.TrimRight(f, " "), "enter toggle") {
-		t.Errorf("toggle is not last in %q", f)
+	if f := footer(m); !strings.HasSuffix(strings.TrimRight(f, " "), "enter toggle • ctrl+a toggle all") {
+		t.Errorf("toggle hints are not last in %q", f)
 	}
 }
 
@@ -258,5 +258,58 @@ func TestVimKeysAndEsc(t *testing.T) {
 	_, cmd = m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if cmd == nil {
 		t.Fatal("ctrl+c no longer quits")
+	}
+}
+
+func TestToggleAll(t *testing.T) {
+	m, repo := newModel(t)
+	press(m, tea.KeyTab) // skills: apple, banana
+	linked := func(name string) bool {
+		fi, err := os.Lstat(filepath.Join(repo.ExposedDir(), name))
+		return err == nil && fi.Mode()&os.ModeSymlink != 0
+	}
+	toggleAll := func() { press(m, tea.KeyCtrlA) }
+
+	// Nothing selected: select all.
+	toggleAll()
+	if !linked("apple") || !linked("banana") {
+		t.Fatal("toggle all did not select every skill")
+	}
+	// All selected: deselect all.
+	toggleAll()
+	if linked("apple") || linked("banana") {
+		t.Fatal("toggle all did not deselect every skill")
+	}
+	// One selected, one not: select all (fills in the gap, keeps the other).
+	press(m, tea.KeyEnter) // apple on
+	toggleAll()
+	if !linked("apple") || !linked("banana") {
+		t.Fatal("toggle all with a mixed state did not select every skill")
+	}
+	// A search narrows what toggle all touches.
+	toggleAll() // all off
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("ban")})
+	toggleAll()
+	if linked("apple") || !linked("banana") {
+		t.Fatal("toggle all acted outside the filtered rows")
+	}
+	if m.status != "" {
+		t.Fatalf("unexpected status %q", m.status)
+	}
+}
+
+func TestToggleAllReportsFailures(t *testing.T) {
+	m, repo := newModel(t)
+	// Occupy apple's link name so it cannot be linked; banana still can.
+	if err := os.Mkdir(filepath.Join(repo.ExposedDir(), "apple"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	press(m, tea.KeyTab)
+	press(m, tea.KeyCtrlA)
+	if fi, err := os.Lstat(filepath.Join(repo.ExposedDir(), "banana")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("a failure on one skill stopped the others")
+	}
+	if !strings.Contains(m.status, "exposing apple") {
+		t.Fatalf("failure not reported: %q", m.status)
 	}
 }

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -272,10 +273,51 @@ func (m *Model) updateSkills(msg tea.KeyMsg) {
 			}
 			m.syncSkills()
 		}
+	case key.Matches(msg, m.keys.ToggleAll):
+		m.toggleAll()
+		m.syncSkills()
 	default:
 		if m.search.Update(msg) {
 			m.syncSkills()
 		}
+	}
+}
+
+// toggleAll acts on the rows currently shown in the checklist, so a search
+// narrows what it touches. If any shown skill is unselected, every shown
+// skill is selected; if all are selected, all are deselected. A skill that
+// cannot be changed is skipped so one clash does not stop the rest, and the
+// failures are summarised in the footer.
+func (m *Model) toggleAll() {
+	items := m.skills.Items()
+	if len(items) == 0 {
+		return
+	}
+	target := false
+	for _, it := range items {
+		if !it.Checked {
+			target = true
+			break
+		}
+	}
+	failed, first := 0, ""
+	for _, it := range items {
+		if it.Checked == target {
+			continue
+		}
+		if err := m.app.SetSelected(it.ID, target); err != nil {
+			failed++
+			if first == "" {
+				first = err.Error()
+			}
+		}
+	}
+	switch failed {
+	case 0:
+	case 1:
+		m.status = first
+	default:
+		m.status = fmt.Sprintf("%d skills could not be changed; first: %s", failed, first)
 	}
 }
 

@@ -104,7 +104,8 @@ split into two subpackages so screens stay free of styling detail:
   rows. Unchecked rows show U+E640, checked rows U+F4A7 (both Nerd Font
   glyphs), the cursor row is bold. The component owns the cursor and scroll
   offset and wraps at both ends; checked state is passed in by the caller
-  and never mutated by the component.
+  and never mutated by the component. `Items` hands back a copy of the rows
+  as last set so the caller can act on exactly what is shown.
 
 - `ui/component/searchbar` is a single-line text field on a dark background
   with a block caret, ported from grove's text input. It owns the typed value
@@ -170,8 +171,19 @@ Key routing while the Skill Libraries panel has focus: up and down move the
 cursor and run `syncLibrary`; every other key goes to that panel's search
 bar, and a consumed key re-runs `syncLibraries`. While the Skills panel has
 focus: up and down move the cursor and run `syncDetails`, enter toggles the
-row under the cursor via `app.ToggleSkill` and re-runs `syncSkills`, and
-every other key goes to the search bar. Up and down also answer to k and j
+row under the cursor via `app.ToggleSkill` and re-runs `syncSkills`, ctrl+a
+toggles every row currently shown, and every other key goes to the search
+bar.
+
+Toggle all works on the rows the checklist is showing, so a search narrows
+its reach. If any shown skill is unselected, all shown skills are selected
+via `app.SetSelected`; if every one is selected, all are deselected. Skills
+that cannot be changed are skipped rather than aborting the sweep, and the
+failures are summarised in the footer. It is bound to ctrl+a because
+ctrl+enter is indistinguishable from enter in a terminal: both arrive as a
+carriage return unless the terminal speaks the kitty keyboard protocol,
+which Bubble Tea v1 does not parse. The binding is only matched while Skills
+has focus, so ctrl+a still means home in the Skill Libraries search. Up and down also answer to k and j
 in every panel; they are matched before the search bar sees the key, so
 those two letters cannot be typed into a search. All other letters and space
 type into the search, which is why toggle is enter rather than space. Quit
@@ -219,7 +231,7 @@ enabled in `main` with `tea.WithMouseCellMotion`. Clicking is not listed in
 the help footer. The footer is rendered with
 `bubbles/help` in short mode from `keyMap.helpFor(focused)` in `keys.go`, so
 every panel lists up, down, next panel, previous panel and quit, and Skills
-alone appends toggle at the end.
+alone appends toggle and toggle all at the end.
 
 ### `internal/app`
 
@@ -237,10 +249,11 @@ tests or a future CLI without changes.
 - `IsSelected(id)` asks `files.IsLinked` whether the skill is linked into
   `repo.ExposedDir()`. It is read from disk on every call, so links made or
   removed outside the program are reflected immediately.
-- `ToggleSkill(id)` links the skill into the exposed directory if it is not
-  linked and unlinks it if it is. A failure, such as a name clash with an
-  already exposed skill from another library, is returned as an error; the
-  existing link is never replaced.
+- `SetSelected(id, selected)` links the skill into the exposed directory or
+  unlinks it, and is a no-op when it is already in that state. A failure,
+  such as a name clash with an already exposed skill from another library,
+  is returned as an error; the existing link is never replaced.
+- `ToggleSkill(id)` flips the skill's state via `SetSelected`.
 - `SkillFile(id)` reads the skill's `SKILL.md`. If it cannot be read the
   returned text says so, so the details panel always has content.
 
