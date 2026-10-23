@@ -282,13 +282,13 @@ builds every path the program needs:
 | Method | Path |
 |---|---|
 | `ExposedDir()` | `<root>/skills`, the directory the agent reads; selected skills are linked here |
-| `LibrariesDir()` | `<root>/third-party-skills`, one cloned library per subdirectory |
+| `LibrariesDir()` | `<root>/skill-libraries`, one cloned library per subdirectory |
 | `LibrarySkillsDir(lib)` | `<lib>/skills`, the flat directory of skills in a library |
 | `SkillFile(skill)` | `<skill>/SKILL.md` |
 
 `FindRoot(start)` walks up from `start` to the first directory containing
 both `skills/` and `skill-selector-app/`. Those are the markers because they
-are committed; `third-party-skills/` is gitignored and absent on a fresh
+are committed; `skill-libraries/` is gitignored and absent on a fresh
 clone. It uses `files.ListDirs` for the check so the package still touches
 the filesystem only through `files`.
 

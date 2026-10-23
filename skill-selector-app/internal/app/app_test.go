@@ -23,10 +23,10 @@ func newWorkspace(t *testing.T) skills.Repo {
 		return p
 	}
 	mk("skills")
-	one := mk("third-party-skills", "alpha", "skills", "one")
-	mk("third-party-skills", "alpha", "skills", "two")
-	mk("third-party-skills", "beta", "skills", "one")
-	mk("third-party-skills", "empty")
+	one := mk("skill-libraries", "alpha", "skills", "one")
+	mk("skill-libraries", "alpha", "skills", "two")
+	mk("skill-libraries", "beta", "skills", "one")
+	mk("skill-libraries", "empty")
 	if err := os.WriteFile(filepath.Join(one, "SKILL.md"), []byte("# one\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -1,29 +1,29 @@
 # agents
 
 A workspace for managing the skills exposed to coding agents. Skills are
-collected from third-party libraries and custom sources, then selectively
+collected from skill libraries and custom sources, then selectively
 linked into place with a terminal UI.
 
 ## Custom Skills
 
 Foo
 
-## Third Party Skills
+## Skill Libraries
 
-Third-party skill libraries are cloned by `install_third_party_skills.sh` into
-the `third-party-skills/` directory. That directory is gitignored, so it acts
+Skill libraries are cloned by `install_skill_libraries.sh` into
+the `skill-libraries/` directory. That directory is gitignored, so it acts
 as a local library to pull skills from rather than something committed to this
-repo. Run `update_third_party_skills.sh` to pull the latest changes for every
+repo. Run `update_skill_libraries.sh` to pull the latest changes for every
 cloned library.
 
 ### Adding new skill libraries
 
 A skill library is a git repository with a `skills/` folder at the root of the
 directory. To add a library, add a `git clone` line to
-`install_third_party_skills.sh` in the following structure:
+`install_skill_libraries.sh` in the following structure:
 
 ```sh
-git clone <repository url> third-party-skills/<name of library>
+git clone <repository url> skill-libraries/<name of library>
 ```
 
 ### Expected layout
@@ -76,7 +76,7 @@ sh skill-selector-app/install.sh
 
 This builds the selector and installs it as `skills` at `~/.local/bin/skills`
 (honoring `$BIN_DIR`). The path of this workspace is compiled into the binary,
-so `skills` finds the right `skills/` and `third-party-skills/`
+so `skills` finds the right `skills/` and `skill-libraries/`
 directories no matter where you run it from. If `~/.local/bin` is not already
 on your `PATH`, the script tells you the line to add to your shell startup
 file.

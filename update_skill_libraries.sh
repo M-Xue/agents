@@ -1,5 +1,5 @@
 #!/bin/sh
-parent="third-party-skills"
+parent="skill-libraries"
 
 
 for dir in "$parent"/*/; do

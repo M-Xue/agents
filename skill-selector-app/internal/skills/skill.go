@@ -14,8 +14,8 @@ const (
 	// exposedDirName is the workspace directory the agent reads skills
 	// from. Selected skills are symlinked into it.
 	exposedDirName = "skills"
-	// librariesDirName holds one cloned third-party library per directory.
-	librariesDirName = "third-party-skills"
+	// librariesDirName holds one cloned skill library per directory.
+	librariesDirName = "skill-libraries"
 	// librarySkillsDirName is the flat directory of skills inside a library.
 	librarySkillsDirName = "skills"
 	// appDirName is this program's source directory. Together with
@@ -56,7 +56,7 @@ func (r Repo) ExposedDir() string {
 	return filepath.Join(r.Root, exposedDirName)
 }
 
-// LibrariesDir holds the third-party skill libraries, one per subdirectory.
+// LibrariesDir holds the skill libraries, one per subdirectory.
 func (r Repo) LibrariesDir() string {
 	return filepath.Join(r.Root, librariesDirName)
 }

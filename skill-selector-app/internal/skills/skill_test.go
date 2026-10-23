@@ -8,7 +8,7 @@ import (
 
 func TestFindRoot(t *testing.T) {
 	root := t.TempDir()
-	for _, d := range []string{"skills", "skill-selector-app", "third-party-skills/lib/skills/a"} {
+	for _, d := range []string{"skills", "skill-selector-app", "skill-libraries/lib/skills/a"} {
 		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -16,7 +16,7 @@ func TestFindRoot(t *testing.T) {
 	// macOS temp dirs live under a symlinked /var; compare resolved paths.
 	want, _ := filepath.EvalSymlinks(root)
 
-	for _, start := range []string{root, filepath.Join(root, "third-party-skills/lib/skills/a")} {
+	for _, start := range []string{root, filepath.Join(root, "skill-libraries/lib/skills/a")} {
 		repo, err := FindRoot(start)
 		if err != nil {
 			t.Fatalf("FindRoot(%s): %v", start, err)
@@ -35,9 +35,9 @@ func TestPaths(t *testing.T) {
 	r := Repo{Root: "/w"}
 	cases := map[string]string{
 		r.ExposedDir():   "/w/skills",
-		r.LibrariesDir(): "/w/third-party-skills",
-		r.LibrarySkillsDir("/w/third-party-skills/lib"):   "/w/third-party-skills/lib/skills",
-		r.SkillFile("/w/third-party-skills/lib/skills/a"): "/w/third-party-skills/lib/skills/a/SKILL.md",
+		r.LibrariesDir(): "/w/skill-libraries",
+		r.LibrarySkillsDir("/w/skill-libraries/lib"):   "/w/skill-libraries/lib/skills",
+		r.SkillFile("/w/skill-libraries/lib/skills/a"): "/w/skill-libraries/lib/skills/a/SKILL.md",
 	}
 	for got, want := range cases {
 		if got != want {

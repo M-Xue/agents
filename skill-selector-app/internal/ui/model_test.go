@@ -20,7 +20,7 @@ func newModel(t *testing.T) (*Model, skills.Repo) {
 	t.Helper()
 	root := t.TempDir()
 	write := func(lib, skill string) {
-		dir := filepath.Join(root, "third-party-skills", lib, "skills", skill)
+		dir := filepath.Join(root, "skill-libraries", lib, "skills", skill)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}

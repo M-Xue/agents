@@ -11,12 +11,12 @@
 # script aborts before moving anything if a flattened name would collide.
 set -eu
 
-lib="${1:-third-party-skills/mattpocock-skills}"
+lib="${1:-skill-libraries/mattpocock-skills}"
 lib="${lib%/}"
 skills="$lib/skills"
 
 if [ ! -d "$skills" ]; then
-  echo "error: $skills does not exist. Run install_third_party_skills.sh first." >&2
+  echo "error: $skills does not exist. Run install_skill_libraries.sh first." >&2
   exit 1
 fi
 
