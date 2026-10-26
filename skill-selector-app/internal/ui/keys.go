@@ -17,19 +17,24 @@ type keyMap struct {
 func defaultKeyMap() keyMap {
 	return keyMap{
 		// Up and down are matched before the search bars see a key, so they
-		// are bound to the arrow keys only. Letters and space fall through to
-		// the focused search bar, which is why toggle is enter rather than
-		// space and why j and k are not navigation keys.
-		Up:     key.NewBinding(key.WithKeys("up"), key.WithHelp("↑", "up")),
-		Down:   key.NewBinding(key.WithKeys("down"), key.WithHelp("↓", "down")),
+		// are bound to keys that never type: the arrows, and tab and
+		// shift+tab. Letters and space fall through to the focused search
+		// bar, which is why toggle is enter rather than space and why j and k
+		// are not navigation keys.
+		Up:     key.NewBinding(key.WithKeys("up", "shift+tab"), key.WithHelp("↑/shift+tab", "up")),
+		Down:   key.NewBinding(key.WithKeys("down", "tab"), key.WithHelp("↓/tab", "down")),
 		Toggle: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "toggle")),
 		// ctrl+enter is not distinguishable from enter in a terminal (both
 		// send a carriage return), so toggle all uses ctrl+a. It is matched
 		// only while Skills has focus, so ctrl+a still means home in the
 		// Skill Libraries search.
 		ToggleAll: key.NewBinding(key.WithKeys("ctrl+a"), key.WithHelp("ctrl+a", "toggle all")),
-		NextPanel: key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next panel")),
-		PrevPanel: key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "prev panel")),
+		// Left and right cycle through the panels. ctrl+tab is not bound
+		// because a terminal sends the same byte for it as for tab. The
+		// arrows are matched before the search bars see them, so they switch
+		// panels rather than moving the search caret.
+		NextPanel: key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "next panel")),
+		PrevPanel: key.NewBinding(key.WithKeys("left"), key.WithHelp("←", "prev panel")),
 		Quit:      key.NewBinding(key.WithKeys("esc", "ctrl+c"), key.WithHelp("esc", "quit")),
 	}
 }

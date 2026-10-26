@@ -85,8 +85,8 @@ func TestLibraryCursorSwapsSkillsAndDetails(t *testing.T) {
 
 func TestSkillCursorChangesDetails(t *testing.T) {
 	m, _ := newModel(t)
-	press(m, tea.KeyTab)  // focus skills
-	press(m, tea.KeyDown) // apple -> banana
+	press(m, tea.KeyRight) // focus skills
+	press(m, tea.KeyDown)  // apple -> banana
 	if v := view(m); !strings.Contains(v, "BANANA SKILL BODY") || strings.Contains(v, "APPLE SKILL BODY") {
 		t.Fatal("details did not follow the skill cursor")
 	}
@@ -94,7 +94,7 @@ func TestSkillCursorChangesDetails(t *testing.T) {
 
 func TestEnterTogglesSymlink(t *testing.T) {
 	m, repo := newModel(t)
-	press(m, tea.KeyTab) // focus skills, cursor on apple
+	press(m, tea.KeyRight) // focus skills, cursor on apple
 	link := filepath.Join(repo.ExposedDir(), "apple")
 
 	press(m, tea.KeyEnter)
@@ -116,7 +116,7 @@ func TestToggleFailureShowsInFooter(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(repo.ExposedDir(), "apple"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	press(m, tea.KeyTab)
+	press(m, tea.KeyRight)
 	press(m, tea.KeyEnter)
 	if m.status == "" || !strings.Contains(view(m), "exposing apple") {
 		t.Fatalf("failure not reported, status=%q", m.status)
@@ -133,7 +133,7 @@ func TestSearchFilterMovesSelection(t *testing.T) {
 	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") {
 		t.Fatal("filtering libraries did not select the surviving library")
 	}
-	press(m, tea.KeyTab)
+	press(m, tea.KeyRight)
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("zzz")}) // no skills match
 	if v := view(m); !strings.Contains(v, "No skill selected") {
 		t.Fatal("empty state not shown when no skill matches")
@@ -332,7 +332,7 @@ func footer(m *Model) string {
 
 func TestHelpFollowsFocus(t *testing.T) {
 	m, _ := newModel(t)
-	common := []string{"↑ up", "↓ down", "next panel", "prev panel", "esc quit"}
+	common := []string{"↑/shift+tab up", "↓/tab down", "→ next panel", "← prev panel", "esc quit"}
 	for _, p := range []panelID{panelLibraries, panelSkills, panelDetails} {
 		m.setFocus(p)
 		f := footer(m)
@@ -383,7 +383,7 @@ func TestLettersTypeIntoSearchAndEsc(t *testing.T) {
 
 func TestToggleAll(t *testing.T) {
 	m, repo := newModel(t)
-	press(m, tea.KeyTab) // skills: apple, banana
+	press(m, tea.KeyRight) // skills: apple, banana
 	linked := func(name string) bool {
 		fi, err := os.Lstat(filepath.Join(repo.ExposedDir(), name))
 		return err == nil && fi.Mode()&os.ModeSymlink != 0
@@ -424,12 +424,68 @@ func TestToggleAllReportsFailures(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(repo.ExposedDir(), "apple"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	press(m, tea.KeyTab)
+	press(m, tea.KeyRight)
 	press(m, tea.KeyCtrlA)
 	if fi, err := os.Lstat(filepath.Join(repo.ExposedDir(), "banana")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
 		t.Fatal("a failure on one skill stopped the others")
 	}
 	if !strings.Contains(m.status, "exposing apple") {
 		t.Fatalf("failure not reported: %q", m.status)
+	}
+}
+
+func TestTabMovesAndArrowsCyclePanels(t *testing.T) {
+	m, _ := newModel(t) // libraries focused, cursor on alpha
+	expectFocus := func(step string, want panelID) {
+		t.Helper()
+		if m.focused != want {
+			t.Fatalf("%s: focused %d, want %d", step, m.focused, want)
+		}
+	}
+
+	// Tab and shift+tab move the cursor like down and up, without changing
+	// focus; the library change flows through to the other panels.
+	press(m, tea.KeyTab)
+	expectFocus("tab", panelLibraries)
+	if sel, _ := m.libraries.Selected(); sel.Label != "beta" {
+		t.Fatalf("tab did not move down: on %q", sel.Label)
+	}
+	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") {
+		t.Fatal("tab did not load beta's skills")
+	}
+	press(m, tea.KeyShiftTab)
+	if sel, _ := m.libraries.Selected(); sel.Label != "alpha" {
+		t.Fatalf("shift+tab did not move up: on %q", sel.Label)
+	}
+
+	// Arrows cycle all three panels, wrapping at both ends.
+	press(m, tea.KeyRight)
+	expectFocus("right from libraries", panelSkills)
+	press(m, tea.KeyTab)
+	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "banana") {
+		t.Fatalf("tab in skills did not move down: on %q", sel.ID)
+	}
+	press(m, tea.KeyRight)
+	expectFocus("right from skills", panelDetails)
+	press(m, tea.KeyRight)
+	expectFocus("right wraps", panelLibraries)
+	press(m, tea.KeyLeft)
+	expectFocus("left wraps", panelDetails)
+
+	// In Details, tab scrolls like down and shift+tab like up.
+	m.detailsSrc = strings.Repeat("line\n\n", 200) // separate paragraphs, so it wraps to many lines
+	m.renderDetails()
+	m.View()
+	press(m, tea.KeyTab)
+	if m.details.Offset() != 1 {
+		t.Fatalf("tab did not scroll details: offset %d", m.details.Offset())
+	}
+	press(m, tea.KeyShiftTab)
+	if m.details.Offset() != 0 {
+		t.Fatalf("shift+tab did not scroll details back: offset %d", m.details.Offset())
+	}
+
+	if m.libSearch.Value() != "" || m.search.Value() != "" {
+		t.Fatalf("search values changed: %q %q", m.libSearch.Value(), m.search.Value())
 	}
 }

@@ -174,6 +174,11 @@ Selection behaviour across filter changes is owned by the list components:
 present, and snaps to the top row (scrolling back to the start) when it has
 been filtered out.
 
+Left and right are matched before any panel sees a key and switch panel.
+That means those arrows do not move the caret inside a search bar; home and
+end still do. Up and down answer to the up and down arrows and to shift+tab
+and tab, all of which are matched before the search bars too.
+
 Key routing while the Skill Libraries panel has focus: up and down move the
 cursor and run `syncLibrary`; every other key goes to that panel's search
 bar, and a consumed key re-runs `syncLibraries`. While the Skills panel has
@@ -229,8 +234,10 @@ many columns each component gets and tells it.
 left and right and 2 rows on the top and bottom. Inside it, from top to
 bottom: the app tab, a blank line, the panels, then a single reserved row for
 the help footer. The panels run right down to the footer with no gap. The three panels, Skill Libraries, Skills and Details, are
-split 1:1:2 with a single blank column between each. Tab and shift+tab move
-focus between them, and a left click inside a panel focuses it; the focused
+split 1:1:2 with a single blank column between each. Left and right arrows
+cycle focus through the three panels, wrapping at both ends. Tab and
+shift+tab are aliases for down and up in every panel. ctrl+tab is not bound
+because a terminal sends the same byte for it as for plain tab. A left click inside a panel focuses it; the focused
 panel takes the active border colour. A left click inside the panel that
 already has focus acts on the row under the pointer: in Skill Libraries it
 selects that library; in Skills it selects that skill, and a click on the
