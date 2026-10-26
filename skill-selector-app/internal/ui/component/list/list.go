@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/maxx/skill-selector-app/internal/ui/theme"
 )
 
 // Item is one row of the list.
@@ -160,7 +162,7 @@ func (m Model) View() string {
 	if m.height <= 0 {
 		return ""
 	}
-	bold := lipgloss.NewStyle().Bold(true)
+	cursor := lipgloss.NewStyle().Bold(true).Background(theme.CursorBg)
 	rows := make([]string, 0, m.height)
 	for i := 0; i < m.height; i++ {
 		idx := m.offset + i
@@ -170,7 +172,7 @@ func (m Model) View() string {
 		}
 		line := fit(m.items[idx].Label, m.width)
 		if idx == m.cursor {
-			line = bold.Render(line)
+			line = cursor.Render(line)
 		}
 		rows = append(rows, line)
 	}

@@ -18,4 +18,9 @@ var (
 	TitleBg = lipgloss.Color("111")
 	// Error colours a failure message shown in place of the help footer.
 	Error = lipgloss.Color("203")
+	// CursorBg fills the whole row under the cursor in the list components.
+	// The text keeps the terminal's default colour, only bolded, so the bar
+	// reads as a highlight behind ordinary text.
+	CursorBg = lipgloss.Color("#363a4f")
+	// CursorBg = lipgloss.Color("#494d64")
 )

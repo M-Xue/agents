@@ -90,14 +90,16 @@ split into two subpackages so screens stay free of styling detail:
 
 - `ui/theme` holds the colour palette. The active border and title tab are
   ANSI 111 (light blue), inactive borders are ANSI 60 (slate), tab text is
-  ANSI 235 (near black).
+  ANSI 235 (near black), and the list cursor row is a bar of `#bac2de`
+  behind the terminal's default text colour.
 - `ui/component/panel` draws a lazygit-style pane: square corners, the title
   rendered as a bold highlighted tab embedded in the top border (`┌─ Title ──┐`),
   content padded one column from each side, always filled to the exact
   width and height requested. `panel.Tab` renders the standalone app title in
   the same style.
-- `ui/component/list` is a scrolling list of `Item{ID, Label}` rows with a
-  bold cursor row. It owns the cursor and scroll offset, wraps at both ends,
+- `ui/component/list` is a scrolling list of `Item{ID, Label}` rows. The
+  cursor row is a full-width bar: bold default-colour text on a
+  `theme.CursorBg` background. It owns the cursor and scroll offset, wraps at both ends,
   and keeps the cursor on the same ID across `SetItems` or snaps to the top.
   `ScrollUp` and `ScrollDown` move the window without the cursor, stopping at
   the ends; the next cursor move brings the cursor back into view. `SetSize`
@@ -105,7 +107,8 @@ split into two subpackages so screens stay free of styling detail:
   so the per-render re-size does not undo a wheel scroll.
 - `ui/component/checklist` is a scrolling list of `Item{ID, Checked, Label}`
   rows. Unchecked rows show U+E640, checked rows U+F4A7 (both Nerd Font
-  glyphs), the cursor row is bold. The component owns the cursor and scroll
+  glyphs), the cursor row is a full-width bar of `theme.CursorBg` behind
+  bold default-colour text. The component owns the cursor and scroll
   offset and wraps at both ends; checked state is passed in by the caller
   and never mutated by the component. `Items` hands back a copy of the rows
   as last set so the caller can act on exactly what is shown. Scrolling
