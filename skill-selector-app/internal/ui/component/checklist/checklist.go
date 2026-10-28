@@ -1,9 +1,11 @@
 // Package checklist renders a vertically scrolling list of items, each with a
-// checked or clear glyph and a label. The item under the cursor is bold.
+// checked or clear glyph and a label. The item under the cursor is bold. A
+// disabled item is drawn dimmed to show it cannot be checked.
 //
 // The component owns only view state: the cursor position and the scroll
-// offset. Which items are checked is the caller's state; it is passed in with
-// SetItems and the caller is told what is under the cursor with Selected.
+// offset. Which items are checked or disabled is the caller's state; it is
+// passed in with SetItems and the caller is told what is under the cursor
+// with Selected.
 package checklist
 
 import (
@@ -25,7 +27,10 @@ const (
 type Item struct {
 	ID      string
 	Checked bool
-	Label   string
+	// Disabled marks a row that cannot currently be checked. It is drawn
+	// dimmed with the clear glyph; the component does not act on it.
+	Disabled bool
+	Label    string
 }
 
 // Model is a scrollable checklist. Zero value is usable.
@@ -177,7 +182,6 @@ func (m Model) View() string {
 	if m.height <= 0 {
 		return ""
 	}
-	cursor := lipgloss.NewStyle().Bold(true).Background(theme.CursorBg)
 	rows := make([]string, 0, m.height)
 	for i := 0; i < m.height; i++ {
 		idx := m.offset + i
@@ -190,11 +194,16 @@ func (m Model) View() string {
 		if it.Checked {
 			glyph = GlyphChecked
 		}
-		line := fit(glyph+" "+it.Label, m.width)
-		if idx == m.cursor {
-			line = cursor.Render(line)
+		// One style per row so the dim foreground and the cursor bar
+		// combine instead of one resetting the other mid-line.
+		style := lipgloss.NewStyle()
+		if it.Disabled {
+			style = style.Foreground(theme.TextInactive)
 		}
-		rows = append(rows, line)
+		if idx == m.cursor {
+			style = style.Bold(true).Background(theme.CursorBg)
+		}
+		rows = append(rows, style.Render(fit(glyph+" "+it.Label, m.width)))
 	}
 	return strings.Join(rows, "\n")
 }

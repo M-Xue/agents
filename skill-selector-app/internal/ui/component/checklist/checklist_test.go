@@ -160,3 +160,34 @@ func TestSelect(t *testing.T) {
 		t.Fatalf("out-of-range Select moved the cursor to %q", sel.ID)
 	}
 }
+
+// Colour is stripped when tests run without a terminal, so the dimming
+// itself cannot be asserted here; this checks everything else about a
+// disabled row.
+func TestDisabledRowKeepsGlyphAndLabel(t *testing.T) {
+	dim := New()
+	list := items(2)
+	list[1].Disabled = true
+	list[1].Checked = true // the glyph follows Checked regardless of Disabled
+	dim.SetItems(list)
+	dim.SetSize(20, 2)
+
+	rows := strings.Split(dim.View(), "\n")
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want 2", len(rows))
+	}
+	if !strings.Contains(rows[1], GlyphChecked) || !strings.Contains(rows[1], "item 1") {
+		t.Fatalf("disabled row lost its glyph or label: %q", rows[1])
+	}
+	list[1].Checked = false
+	dim.SetItems(list)
+	if rows := strings.Split(dim.View(), "\n"); !strings.Contains(rows[1], GlyphClear) {
+		t.Fatalf("unchecked disabled row did not show the clear glyph: %q", rows[1])
+	}
+	// Disabled is view state only: the cursor still lands on the row and it
+	// is reported as selected.
+	dim.MoveDown()
+	if sel, _ := dim.Selected(); sel.ID != "1" || !sel.Disabled {
+		t.Fatalf("cursor did not land on the disabled row: %+v", sel)
+	}
+}

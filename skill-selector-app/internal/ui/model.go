@@ -121,10 +121,13 @@ func (m *Model) syncDetails() {
 }
 
 // syncLibrary makes the library under the Skill Libraries cursor current in
-// the app and rebuilds the Skills panel from it. The checklist snaps to its
-// first row because no skill ID from the old library survives, which is how
-// the first skill of a newly chosen library ends up selected. It is a no-op
-// when the cursor is still on the same library.
+// the app and rebuilds the Skills panel from it. Between two installed
+// libraries the checklist snaps to its first row because no skill ID from the
+// old library survives, which is how the first skill of a newly chosen
+// library ends up selected. Moving between an installed library and the
+// built-in All library keeps the cursor on the same skill, since its ID is
+// present in both. It is a no-op when the cursor is still on the same
+// library.
 func (m *Model) syncLibrary() {
 	id := ""
 	if sel, ok := m.libraries.Selected(); ok {
@@ -147,7 +150,8 @@ func (m *Model) renderDetails() {
 }
 
 // syncLibraries rebuilds the library rows from app state, piped through the
-// fuzzy predicate built from the libraries search value.
+// fuzzy predicate built from the libraries search value. The built-in All
+// library is filtered like any other row.
 func (m *Model) syncLibraries() {
 	libs := m.app.Libraries()
 	items := make([]list.Item, 0, len(libs))
@@ -164,17 +168,44 @@ func (m *Model) syncLibraries() {
 // piped through the fuzzy predicate built from the search value. The search
 // bar and checklist never see each other; this is the only place they meet.
 // The checklist keeps its cursor on the same ID when it survives the filter
-// and falls back to the top row when it does not.
+// and falls back to the top row when it does not. While the built-in All
+// library is current, each row carries its library's name so skills that
+// share a name across libraries can be told apart; the search matches the
+// whole row, so a library name narrows the list too.
 func (m *Model) syncSkills() {
 	skills := m.app.Skills()
 	items := make([]checklist.Item, 0, len(skills))
 	for _, s := range skills {
-		items = append(items, checklist.Item{ID: s.ID, Checked: m.app.IsSelected(s.ID), Label: s.Label})
+		shadowed := m.app.ShadowedBy(s.ID) != ""
+		items = append(items, checklist.Item{
+			ID:       s.ID,
+			Checked:  m.app.IsSelected(s.ID),
+			Disabled: shadowed,
+			Label:    m.skillLabel(s, shadowed),
+		})
 	}
 	match := fuzzy.Predicate(m.search.Value())
 	items = fuzzy.Filter(items, func(it checklist.Item) bool { return match(it.Label) })
 	m.skills.SetItems(items)
 	m.syncDetails()
+}
+
+// shadowedSuffix is appended to the row of a skill whose name is already
+// held in the exposed directory by something else.
+const shadowedSuffix = "[skill with same name already exists]"
+
+// skillLabel is the checklist row text for a skill: its name, followed by
+// its library in parentheses while the All library is current, followed by
+// shadowedSuffix when the skill is shadowed.
+func (m *Model) skillLabel(s app.Skill, shadowed bool) string {
+	label := s.Label
+	if m.libraryID == app.AllLibraryID {
+		label += " (" + s.Library + ")"
+	}
+	if shadowed {
+		label += " " + shadowedSuffix
+	}
+	return label
 }
 
 func (m *Model) Init() tea.Cmd { return nil }
@@ -381,10 +412,14 @@ func (m *Model) updateSkills(msg tea.KeyMsg) {
 }
 
 // toggleAll acts on the rows currently shown in the checklist, so a search
-// narrows what it touches. If any shown skill is unselected, every shown
-// skill is selected; if all are selected, all are deselected. A skill that
-// cannot be changed is skipped so one clash does not stop the rest, and the
-// failures are summarised in the footer.
+// narrows what it touches. Shadowed rows, whose name another exposed skill
+// already holds, are left out of the decision and the sweep: they count as
+// toggled. So if any shown skill is unselected and not shadowed, every such
+// skill is selected; if every shown skill is selected or shadowed, all are
+// deselected. While selecting, a skill whose name was taken earlier in the
+// same sweep is skipped silently rather than reported, since it is shadowed
+// by the time its turn comes. Any other failure is skipped so one problem
+// does not stop the rest, and the failures are summarised in the footer.
 func (m *Model) toggleAll() {
 	items := m.skills.Items()
 	if len(items) == 0 {
@@ -392,14 +427,17 @@ func (m *Model) toggleAll() {
 	}
 	target := false
 	for _, it := range items {
-		if !it.Checked {
+		if !it.Checked && !it.Disabled {
 			target = true
 			break
 		}
 	}
 	failed, first := 0, ""
 	for _, it := range items {
-		if it.Checked == target {
+		if it.Checked == target || it.Disabled {
+			continue
+		}
+		if target && m.app.ShadowedBy(it.ID) != "" {
 			continue
 		}
 		if err := m.app.SetSelected(it.ID, target); err != nil {

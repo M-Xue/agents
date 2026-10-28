@@ -66,6 +66,20 @@ toggling a skill on or off only adds or removes a link rather than copying
 files. See [Installing the skill selector](#installing-the-skill-selector)
 to set it up, then run `skills` from anywhere.
 
+The Skill Libraries panel lists every cloned library plus a built-in
+`All [built-in]` entry at the top, which is selected on startup. It combines
+the skills of every library into one list, with each skill tagged with its
+library name since different libraries can ship skills with the same name.
+Searching in that view matches library names too, so typing a library's name
+narrows the list to its skills.
+
+Because a skill is exposed under its directory name, only one skill of a
+given name can be on at a time. When one is, the same-named skills in other
+libraries are shown dimmed with a `[skill with same name already exists]`
+suffix; toggling one of them explains which library
+already holds the name, and toggle all (ctrl+a) treats them as already
+toggled, so it still switches everything else off and on cleanly.
+
 ## Installing the skill selector
 
 Requirements:

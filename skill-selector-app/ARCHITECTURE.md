@@ -63,7 +63,7 @@ skill-selector-app/
     └── files/                  filesystem access only, no business logic
         ├── doc.go
         ├── read.go             Read(path)
-        ├── symlink.go          IsLinked, Link, Unlink
+        ├── symlink.go          IsLinked, Link, Unlink, Blocker
         └── list.go             ListDirs(path)
 ```
 
@@ -105,14 +105,19 @@ split into two subpackages so screens stay free of styling detail:
   the ends; the next cursor move brings the cursor back into view. `SetSize`
   only re-anchors the window on the cursor when the height actually changes,
   so the per-render re-size does not undo a wheel scroll.
-- `ui/component/checklist` is a scrolling list of `Item{ID, Checked, Label}`
-  rows. Unchecked rows show U+E640, checked rows U+F4A7 (both Nerd Font
-  glyphs), the cursor row is a full-width bar of `theme.CursorBg` behind
-  bold default-colour text. The component owns the cursor and scroll
-  offset and wraps at both ends; checked state is passed in by the caller
-  and never mutated by the component. `Items` hands back a copy of the rows
-  as last set so the caller can act on exactly what is shown. Scrolling
-  without the cursor works as in `list`.
+- `ui/component/checklist` is a scrolling list of
+  `Item{ID, Checked, Disabled, Label}` rows. Unchecked rows show U+E640,
+  checked rows U+F4A7 (both Nerd Font glyphs), the cursor row is a
+  full-width bar of `theme.CursorBg` behind bold default-colour text. A
+  disabled row is drawn in `theme.TextInactive` to show it cannot currently
+  be checked; the cursor still lands on it and the glyph still follows
+  `Checked`. Each row is rendered with one combined style so the dim
+  foreground and the cursor bar do not reset each other mid-line. The
+  component owns the cursor and scroll offset and wraps at both ends;
+  checked and disabled state are passed in by the caller and never mutated
+  by the component. `Items` hands back a copy of the rows as last set so the
+  caller can act on exactly what is shown. Scrolling without the cursor
+  works as in `list`.
 
 - `ui/component/searchbar` is a single-line text field on a dark background
   with a block caret, ported from grove's text input. It owns the typed value
@@ -160,9 +165,16 @@ syncDetails:   skill under cursor → app.SkillFile → markdown.Render → file
 `syncDetails` only re-reads and rewinds when the cursor lands on a different
 skill, so a toggle or a re-filter that leaves the cursor in place keeps the
 reader's scroll position. Because skill IDs are directory paths, none of the
-old library's IDs survive a library change, so the checklist snaps to its
-first row: the first skill of a newly chosen library is selected
-automatically and its file appears in Details.
+old library's IDs survive a change between two installed libraries, so the
+checklist snaps to its first row: the first skill of a newly chosen library
+is selected automatically and its file appears in Details. Moving between an
+installed library and the built-in All library is the exception: the skill
+under the cursor exists in both lists, so the cursor stays on it.
+
+While All is current, `syncSkills` labels each row `name (library)` via
+`skillLabel`, since libraries can share skill names. The fuzzy filter runs
+over that whole label, so typing a library name narrows the list to its
+skills. Outside All the label is the bare skill name.
 
 `internal/fuzzy` is a pure utility with no UI or app knowledge. `Match` is a
 case-insensitive subsequence test that ignores spaces in the query, so
@@ -188,10 +200,16 @@ toggles every row currently shown, and every other key goes to the search
 bar.
 
 Toggle all works on the rows the checklist is showing, so a search narrows
-its reach. If any shown skill is unselected, all shown skills are selected
-via `app.SetSelected`; if every one is selected, all are deselected. Skills
-that cannot be changed are skipped rather than aborting the sweep, and the
-failures are summarised in the footer. It is bound to ctrl+a because
+its reach. Shadowed rows, those whose name is already held in the exposed
+directory by another library's skill or a foreign entry, count as toggled:
+they are left out of both the decision and the sweep. If any shown skill is
+unselected and not shadowed, all such skills are selected via
+`app.SetSelected`; if every shown skill is selected or shadowed, all are
+deselected. While selecting, a skill whose name was taken earlier in the same
+sweep (the second `tdd` in the All view, say) is skipped silently, since it is
+shadowed by the time its turn comes. Any other skill that cannot be changed
+is skipped rather than aborting the sweep, and the failures are summarised in
+the footer. It is bound to ctrl+a because
 ctrl+enter is indistinguishable from enter in a terminal: both arrive as a
 carriage return unless the terminal speaks the kitty keyboard protocol,
 which Bubble Tea v1 does not parse. The binding is only matched while Skills
@@ -204,7 +222,13 @@ is esc or ctrl+c.
 When `app.ToggleSkill` or `app.SelectLibrary` returns an error, its message
 is shown in the footer row in `theme.Error` in place of the help until the
 next key. The usual cause is a name clash: two libraries each have a skill
-of the same name and one is already exposed.
+of the same name and one is already exposed. The message names the library
+that holds the name (`exposing tdd: already exposed from pstack`), so the
+user knows which link to turn off first. Shadowed rows are passed to the
+checklist as `Disabled` and drawn dimmed, and `skillLabel` appends
+`[skill with same name already exists]` after the name (and after the
+library suffix in the All view), so a clash is visible before any key is
+pressed. The fuzzy filter sees the suffix like the rest of the label.
 
 Both search panels share one layout helper, `searchPanelContent`, that
 stacks the top padding, the labelled search row, a blank row and the list
@@ -265,18 +289,32 @@ the UI needs. It knows nothing about the terminal and can be driven from
 tests or a future CLI without changes.
 
 - `New(repo)` lists the subdirectories of `repo.LibrariesDir()` once; each
-  is a `Library` whose ID is its path and whose label is its name.
+  is a `Library` whose ID is its path and whose label is its name. The list
+  always starts with the built-in combined library, labelled
+  `All [built-in]`, whose ID is the constant `AllLibraryID` (`*`, which can
+  never be a directory path). It is first so a fresh start shows every skill.
 - `SelectLibrary(id)` lists the subdirectories of that library's skills
-  directory; each is a `Skill` whose ID is its path. An unknown or empty ID
-  clears the list. A library with no skills directory yields an empty list
-  and an error for the UI to report.
+  directory; each is a `Skill` whose ID is its path and whose `Library`
+  field names the library it came from. An unknown or empty ID clears the
+  list. A library with no skills directory yields an empty list and an error
+  for the UI to report. Selecting `AllLibraryID` loads every installed
+  library's skills, sorted by skill name and then library name so same-named
+  skills sit together; a library that cannot be listed is skipped, the others
+  still load, and the failures come back as one error.
 - `IsSelected(id)` asks `files.IsLinked` whether the skill is linked into
   `repo.ExposedDir()`. It is read from disk on every call, so links made or
   removed outside the program are reflected immediately.
+- `ShadowedBy(id)` asks `files.Blocker` what holds the skill's name in the
+  exposed directory when it is neither free nor the skill's own link. When
+  the blocker is a skill of an installed library it returns that library's
+  name; for anything else it returns the blocker's path; "" means the skill
+  can be exposed or already is. Like `IsSelected` it reads from disk each
+  call.
 - `SetSelected(id, selected)` links the skill into the exposed directory or
-  unlinks it, and is a no-op when it is already in that state. A failure,
-  such as a name clash with an already exposed skill from another library,
-  is returned as an error; the existing link is never replaced.
+  unlinks it, and is a no-op when it is already in that state. Before
+  linking it checks `ShadowedBy` and fails with a message naming what is in
+  the way: `already exposed from <library>` or
+  `name already taken by <path>`. The existing entry is never replaced.
 - `ToggleSkill(id)` flips the skill's state via `SetSelected`.
 - `SkillFile(id)` reads the skill's `SKILL.md`. If it cannot be read the
   returned text says so, so the details panel always has content.
@@ -304,7 +342,7 @@ the filesystem only through `files`.
 
 ### `internal/files`
 
-Thin wrapper over filesystem access. Its exported API is exactly five
+Thin wrapper over filesystem access. Its exported API is exactly six
 functions and nothing else; helpers stay unexported so callers never depend
 on how a check is performed:
 
@@ -317,6 +355,10 @@ on how a check is performed:
   folder `target`.
 - `Link(dir, target)` creates that symlink, storing `target`'s absolute path.
 - `Unlink(dir, target)` removes it.
+- `Blocker(dir, target)` reports what stops `Link` from succeeding: "" when
+  the name is free or already links to `target`, the destination of a
+  symlink to somewhere else, or the path of a real file or directory that
+  holds the name.
 
 Every symlink function uses the same convention: the link lives in `dir` and
 is named after the last path element of `target`, so linking

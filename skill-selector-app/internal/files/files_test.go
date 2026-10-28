@@ -169,3 +169,39 @@ func writeFile(t *testing.T, parent, name string) {
 		t.Fatal(err)
 	}
 }
+
+func TestBlocker(t *testing.T) {
+	dir := t.TempDir()
+	lib := t.TempDir()
+	target := mkdir(t, mkdir(t, lib, "a"), "code-review")
+	other := mkdir(t, mkdir(t, lib, "b"), "code-review")
+
+	// Nothing there: free.
+	if got, err := Blocker(dir, target); err != nil || got != "" {
+		t.Fatalf("Blocker on empty dir = %q, %v", got, err)
+	}
+	// Our own link: still free.
+	if err := Link(dir, target); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Blocker(dir, target); err != nil || got != "" {
+		t.Fatalf("Blocker with own link = %q, %v", got, err)
+	}
+	// From the other skill's point of view the name is held by a link to
+	// target, and Blocker names that destination.
+	got, err := Blocker(dir, other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want, _ := canonical(target); got != want && got != target {
+		t.Fatalf("Blocker(other) = %q, want %q", got, target)
+	}
+	// A real directory of the same name blocks with its own path.
+	if err := Unlink(dir, target); err != nil {
+		t.Fatal(err)
+	}
+	real := mkdir(t, dir, "code-review")
+	if got, err := Blocker(dir, target); err != nil || got != real {
+		t.Fatalf("Blocker with real dir = %q, %v, want %q", got, err, real)
+	}
+}

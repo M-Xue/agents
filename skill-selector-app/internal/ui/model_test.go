@@ -15,7 +15,8 @@ import (
 
 // newModel builds a workspace with libraries alpha (skills apple, banana)
 // and beta (skill cherry), each with a distinctive SKILL.md, and returns a
-// sized model focused on the libraries panel.
+// sized model focused on the libraries panel. The library list is therefore
+// All [built-in], alpha, beta, with the cursor on All at startup.
 func newModel(t *testing.T) (*Model, skills.Repo) {
 	t.Helper()
 	root := t.TempDir()
@@ -54,23 +55,33 @@ var ansi = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 // splits styled headings into several escape-delimited runs.
 func view(m *Model) string { return ansi.ReplaceAllString(m.View(), "") }
 
-func TestStartupSelectsFirstLibraryAndSkill(t *testing.T) {
+func TestStartupSelectsAllLibrariesAndFirstSkill(t *testing.T) {
 	m, _ := newModel(t)
 	v := view(m)
-	for _, want := range []string{"alpha", "beta", "apple", "banana", "APPLE SKILL BODY"} {
+	// All is first and current, so every library's skills are listed, each
+	// tagged with its library, and the first skill's file is shown.
+	for _, want := range []string{"All [built-in]", "alpha", "beta", "apple (alpha)", "banana (alpha)", "cherry (beta)", "APPLE SKILL BODY"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q", want)
 		}
 	}
-	if strings.Contains(v, "cherry") {
-		t.Error("beta's skill shown while alpha is selected")
+	if sel, _ := m.libraries.Selected(); sel.ID != app.AllLibraryID {
+		t.Errorf("startup library = %q, want All", sel.Label)
 	}
 }
 
 func TestLibraryCursorSwapsSkillsAndDetails(t *testing.T) {
 	m, _ := newModel(t)
-	press(m, tea.KeyDown) // libraries: alpha -> beta
+	press(m, tea.KeyDown) // libraries: All -> alpha
 	v := view(m)
+	if !strings.Contains(v, "APPLE SKILL BODY") || strings.Contains(v, "cherry") {
+		t.Fatal("alpha's skills not shown alone after moving library cursor")
+	}
+	if strings.Contains(v, "apple (alpha)") {
+		t.Fatal("library suffix shown outside the All library")
+	}
+	press(m, tea.KeyDown) // alpha -> beta
+	v = view(m)
 	if !strings.Contains(v, "cherry") || !strings.Contains(v, "CHERRY SKILL BODY") {
 		t.Fatal("beta's first skill not shown after moving library cursor")
 	}
@@ -80,6 +91,48 @@ func TestLibraryCursorSwapsSkillsAndDetails(t *testing.T) {
 	press(m, tea.KeyUp) // back to alpha: first skill again
 	if v := view(m); !strings.Contains(v, "APPLE SKILL BODY") {
 		t.Fatal("alpha's first skill not restored")
+	}
+}
+
+func TestAllLibraryKeepsCursorAndToggles(t *testing.T) {
+	m, repo := newModel(t)
+	linked := func(name string) bool {
+		fi, err := os.Lstat(filepath.Join(repo.ExposedDir(), name))
+		return err == nil && fi.Mode()&os.ModeSymlink != 0
+	}
+
+	// In All, the skills search matches the library suffix too.
+	press(m, tea.KeyRight) // focus skills
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("beta")})
+	if v := view(m); !strings.Contains(v, "cherry (beta)") || strings.Contains(v, "apple") {
+		t.Fatalf("searching a library name in All did not narrow to its skills: %q", v)
+	}
+	// Toggling in All links the real skill directory.
+	press(m, tea.KeyEnter)
+	if !linked("cherry") {
+		t.Fatal("enter in All did not link cherry")
+	}
+	for range 4 {
+		press(m, tea.KeyBackspace) // clear the search; cursor stays on cherry
+	}
+
+	// Moving the library cursor from All to the skill's own library keeps the
+	// cursor on that skill, since its ID is present in both lists.
+	press(m, tea.KeyUp)   // cherry -> banana
+	press(m, tea.KeyLeft) // focus libraries (All)
+	press(m, tea.KeyDown) // All -> alpha
+	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "banana") {
+		t.Fatalf("library change lost the skill cursor: on %q", sel.ID)
+	}
+	if v := view(m); !strings.Contains(v, "BANANA SKILL BODY") {
+		t.Fatal("details did not stay on banana")
+	}
+	press(m, tea.KeyUp) // alpha -> All
+	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "banana") {
+		t.Fatalf("returning to All lost the skill cursor: on %q", sel.ID)
+	}
+	if v := view(m); !strings.Contains(v, "cherry (beta)") {
+		t.Fatal("All did not relist every library's skills")
 	}
 }
 
@@ -118,7 +171,7 @@ func TestToggleFailureShowsInFooter(t *testing.T) {
 	}
 	press(m, tea.KeyRight)
 	press(m, tea.KeyEnter)
-	if m.status == "" || !strings.Contains(view(m), "exposing apple") {
+	if m.status == "" || !strings.Contains(view(m), "exposing apple: name already taken by") {
 		t.Fatalf("failure not reported, status=%q", m.status)
 	}
 	press(m, tea.KeyDown)
@@ -130,7 +183,9 @@ func TestToggleFailureShowsInFooter(t *testing.T) {
 func TestSearchFilterMovesSelection(t *testing.T) {
 	m, _ := newModel(t)
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("bet")}) // libraries search
-	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") {
+	// All is filtered out like any other library, so beta is the only row
+	// left and is selected.
+	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") || strings.Contains(v, "built-in") {
 		t.Fatal("filtering libraries did not select the surviving library")
 	}
 	press(m, tea.KeyRight)
@@ -258,17 +313,18 @@ func TestClickSelectsRowInFocusedPanel(t *testing.T) {
 		return err == nil && fi.Mode()&os.ModeSymlink != 0
 	}
 
-	// Libraries is focused: clicking its second row selects beta.
-	click(m, libX, firstRow+1)
+	// Libraries is focused: clicking its third row (All, alpha, beta)
+	// selects beta.
+	click(m, libX, firstRow+2)
 	if sel, _ := m.libraries.Selected(); sel.Label != "beta" {
 		t.Fatalf("click did not select beta: %q", sel.Label)
 	}
 	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") {
 		t.Fatal("selecting beta by click did not load its skills")
 	}
-	click(m, libX, firstRow) // back to alpha
-	if v := view(m); !strings.Contains(v, "APPLE SKILL BODY") {
-		t.Fatal("click back to alpha did not reload its skills")
+	click(m, libX, firstRow+1) // alpha
+	if v := view(m); !strings.Contains(v, "APPLE SKILL BODY") || strings.Contains(v, "cherry") {
+		t.Fatal("click on alpha did not load its skills alone")
 	}
 
 	// Clicking the search row or past the last row changes nothing.
@@ -357,8 +413,8 @@ func TestLettersTypeIntoSearchAndEsc(t *testing.T) {
 	typed := func(r rune) { m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}) }
 
 	// j and k are not navigation keys: they must reach the focused search
-	// bar rather than move the cursor. "jk" matches no library, so the
-	// filtered list empties and no skill body is shown at all.
+	// bar rather than move the cursor. "jk" matches no library, All
+	// included, so the filtered list empties and no skill body is shown.
 	typed('j')
 	typed('k')
 	if got := m.libSearch.Value(); got != "jk" {
@@ -367,7 +423,7 @@ func TestLettersTypeIntoSearchAndEsc(t *testing.T) {
 	if v := view(m); strings.Contains(v, "CHERRY SKILL BODY") {
 		t.Fatal("j moved the library cursor to beta")
 	}
-	if v := view(m); strings.Contains(v, "alpha") || strings.Contains(v, "beta") {
+	if v := view(m); strings.Contains(v, "alpha") || strings.Contains(v, "beta") || strings.Contains(v, "built-in") {
 		t.Fatalf("typing jk did not filter the library list: %q", v)
 	}
 
@@ -383,6 +439,7 @@ func TestLettersTypeIntoSearchAndEsc(t *testing.T) {
 
 func TestToggleAll(t *testing.T) {
 	m, repo := newModel(t)
+	press(m, tea.KeyDown)  // libraries: All -> alpha
 	press(m, tea.KeyRight) // skills: apple, banana
 	linked := func(name string) bool {
 		fi, err := os.Lstat(filepath.Join(repo.ExposedDir(), name))
@@ -418,6 +475,107 @@ func TestToggleAll(t *testing.T) {
 	}
 }
 
+// withClash rebuilds the model of newModel after adding beta/apple, so the
+// All view lists apple from both alpha and beta.
+func withClash(t *testing.T, repo skills.Repo) *Model {
+	t.Helper()
+	dir := filepath.Join(repo.LibrariesDir(), "beta", "skills", "apple")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("# BETA APPLE BODY\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a, err := app.New(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := New(a)
+	m.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
+	return m
+}
+
+func TestToggleAllTreatsShadowedAsToggled(t *testing.T) {
+	_, repo := newModel(t)
+	m := withClash(t, repo) // All: apple (alpha), apple (beta), banana (alpha), cherry (beta)
+	linkedTo := func(name, lib string) bool {
+		dest, err := os.Readlink(filepath.Join(repo.ExposedDir(), name))
+		return err == nil && strings.Contains(dest, string(filepath.Separator)+lib+string(filepath.Separator))
+	}
+	press(m, tea.KeyRight) // focus skills
+
+	// First sweep: alpha's apple wins the name, beta's is skipped silently.
+	press(m, tea.KeyCtrlA)
+	if !linkedTo("apple", "alpha") || !linkedTo("banana", "alpha") || !linkedTo("cherry", "beta") {
+		t.Fatal("toggle all did not link every linkable skill")
+	}
+	if m.status != "" {
+		t.Fatalf("a shadowed skill was reported as a failure: %q", m.status)
+	}
+	items := m.skills.Items()
+	if !items[1].Disabled || items[0].Disabled || items[2].Disabled {
+		t.Fatalf("shadowed state wrong after sweep: %+v", items)
+	}
+	// The shadowed row says so, after the library suffix; the others do not.
+	if want := "apple (beta) " + shadowedSuffix; items[1].Label != want {
+		t.Fatalf("shadowed label = %q, want %q", items[1].Label, want)
+	}
+	if items[0].Label != "apple (alpha)" {
+		t.Fatalf("unshadowed label = %q", items[0].Label)
+	}
+	// Outside All the suffix follows the bare name.
+	press(m, tea.KeyLeft) // libraries
+	press(m, tea.KeyDown) // All -> alpha
+	press(m, tea.KeyDown) // alpha -> beta
+	if sel, _ := m.skills.Selected(); sel.Label != "apple "+shadowedSuffix {
+		t.Fatalf("shadowed label in beta = %q", sel.Label)
+	}
+	press(m, tea.KeyUp)    // beta -> alpha
+	press(m, tea.KeyUp)    // alpha -> All
+	press(m, tea.KeyRight) // back to skills
+
+	// Every row is selected or shadowed: the next sweep deselects all.
+	press(m, tea.KeyCtrlA)
+	for _, name := range []string{"apple", "banana", "cherry"} {
+		if _, err := os.Lstat(filepath.Join(repo.ExposedDir(), name)); !os.IsNotExist(err) {
+			t.Fatalf("%s still linked after deselect-all", name)
+		}
+	}
+	if m.status != "" {
+		t.Fatalf("unexpected status %q", m.status)
+	}
+	for _, it := range m.skills.Items() {
+		if it.Disabled {
+			t.Fatalf("row still shadowed after every link was removed: %+v", it)
+		}
+	}
+
+	// Mixed: beta's apple exposed by hand shadows alpha's; banana off. A
+	// sweep selects the rest and leaves beta's apple in place.
+	press(m, tea.KeyDown) // cursor on apple (beta)
+	press(m, tea.KeyEnter)
+	if !linkedTo("apple", "beta") {
+		t.Fatal("enter did not link beta's apple")
+	}
+	press(m, tea.KeyCtrlA)
+	if !linkedTo("apple", "beta") || !linkedTo("banana", "alpha") || !linkedTo("cherry", "beta") {
+		t.Fatal("mixed sweep did not select the remaining skills or disturbed beta's apple")
+	}
+	if m.status != "" {
+		t.Fatalf("unexpected status %q", m.status)
+	}
+
+	// Enter on the shadowed row explains who holds the name.
+	press(m, tea.KeyUp) // cursor on apple (alpha)
+	press(m, tea.KeyEnter)
+	if want := "exposing apple: already exposed from beta"; m.status != want {
+		t.Fatalf("status = %q, want %q", m.status, want)
+	}
+	if !linkedTo("apple", "beta") {
+		t.Fatal("beta's link was replaced")
+	}
+}
+
 func TestToggleAllReportsFailures(t *testing.T) {
 	m, repo := newModel(t)
 	// Occupy apple's link name so it cannot be linked; banana still can.
@@ -429,13 +587,19 @@ func TestToggleAllReportsFailures(t *testing.T) {
 	if fi, err := os.Lstat(filepath.Join(repo.ExposedDir(), "banana")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
 		t.Fatal("a failure on one skill stopped the others")
 	}
-	if !strings.Contains(m.status, "exposing apple") {
+	// A foreign directory is a shadow too, so the sweep skips apple without
+	// reporting it; only enter on the row explains what is in the way.
+	if m.status != "" {
+		t.Fatalf("shadowed row reported as a failure: %q", m.status)
+	}
+	press(m, tea.KeyEnter) // cursor is on apple
+	if !strings.Contains(m.status, "exposing apple: name already taken by") {
 		t.Fatalf("failure not reported: %q", m.status)
 	}
 }
 
 func TestTabMovesAndArrowsCyclePanels(t *testing.T) {
-	m, _ := newModel(t) // libraries focused, cursor on alpha
+	m, _ := newModel(t) // libraries focused, cursor on All
 	expectFocus := func(step string, want panelID) {
 		t.Helper()
 		if m.focused != want {
@@ -447,14 +611,14 @@ func TestTabMovesAndArrowsCyclePanels(t *testing.T) {
 	// focus; the library change flows through to the other panels.
 	press(m, tea.KeyTab)
 	expectFocus("tab", panelLibraries)
-	if sel, _ := m.libraries.Selected(); sel.Label != "beta" {
+	if sel, _ := m.libraries.Selected(); sel.Label != "alpha" {
 		t.Fatalf("tab did not move down: on %q", sel.Label)
 	}
-	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") {
-		t.Fatal("tab did not load beta's skills")
+	if v := view(m); strings.Contains(v, "cherry") {
+		t.Fatal("tab did not load alpha's skills alone")
 	}
 	press(m, tea.KeyShiftTab)
-	if sel, _ := m.libraries.Selected(); sel.Label != "alpha" {
+	if sel, _ := m.libraries.Selected(); sel.ID != app.AllLibraryID {
 		t.Fatalf("shift+tab did not move up: on %q", sel.Label)
 	}
 

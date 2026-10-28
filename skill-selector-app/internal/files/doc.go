@@ -3,8 +3,8 @@
 // It exposes exactly the operations the rest of the program needs and
 // nothing else: reading a file as text, listing the directories under a
 // path, and adding, removing and checking symlinks that expose one folder
-// inside another. It contains no business logic and knows nothing about
-// skills.
+// inside another, including what is in the way when one cannot be added. It
+// contains no business logic and knows nothing about skills.
 //
 // Every symlink operation takes the same two arguments: dir, the folder the
 // link lives in, and target, the folder being linked. The link is always

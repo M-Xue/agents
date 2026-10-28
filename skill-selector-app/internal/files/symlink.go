@@ -62,6 +62,40 @@ func Unlink(dir, target string) error {
 	return os.Remove(link)
 }
 
+// Blocker reports what stops target from being linked into dir. It returns
+// "" when the link name is free or already holds a link to target. When a
+// symlink to somewhere else holds the name, it returns that link's
+// destination as an absolute path; when a real file or directory holds the
+// name, it returns that entry's own path.
+func Blocker(dir, target string) (string, error) {
+	link := linkPath(dir, target)
+	info, err := os.Lstat(link)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		return link, nil
+	}
+	ok, err := pointsAt(link, target)
+	if err != nil {
+		return "", err
+	}
+	if ok {
+		return "", nil
+	}
+	dest, err := os.Readlink(link)
+	if err != nil {
+		return "", err
+	}
+	if !filepath.IsAbs(dest) {
+		dest = filepath.Join(filepath.Dir(link), dest)
+	}
+	return filepath.Clean(dest), nil
+}
+
 // linkPath is where the link for target lives inside dir.
 func linkPath(dir, target string) string {
 	return filepath.Join(dir, filepath.Base(target))
