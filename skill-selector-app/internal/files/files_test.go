@@ -100,6 +100,25 @@ func TestLinkRoundTrip(t *testing.T) {
 	}
 }
 
+// Git does not track empty directories, so on a fresh clone the exposed
+// skills directory is missing. Link must create it rather than fail.
+func TestLinkCreatesMissingDir(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "skills")
+	target := filepath.Join(t.TempDir(), "grilling")
+	mkdir(t, filepath.Dir(target), "grilling")
+
+	if err := Link(dir, target); err != nil {
+		t.Fatalf("Link into missing dir: %v", err)
+	}
+	ok, err := IsLinked(dir, target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected skill to be linked")
+	}
+}
+
 func TestLinkRelativeTarget(t *testing.T) {
 	dir := t.TempDir()
 	base := t.TempDir()

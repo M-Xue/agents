@@ -63,7 +63,7 @@ func TestLibrariesAndSkills(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := labels(a.Libraries()); got != "All [built-in],Currently selected [built-in],alpha,beta,empty" {
+	if got := labels(a.Libraries()); got != "All,Currently selected,alpha,beta,empty" {
 		t.Fatalf("Libraries = %s", got)
 	}
 	if a.Libraries()[0].ID != AllLibraryID || a.Libraries()[1].ID != SelectedLibraryID {
@@ -261,7 +261,7 @@ func TestSelectAllCombinesLibraries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := labels(b.Libraries()); got != "All [built-in],Currently selected [built-in]" {
+	if got := labels(b.Libraries()); got != "All,Currently selected" {
 		t.Fatalf("Libraries = %s", got)
 	}
 	if err := b.SelectLibrary(AllLibraryID); err != nil || len(b.Skills()) != 0 {

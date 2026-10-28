@@ -1,5 +1,15 @@
 # agents
 
+> **Clone this repo to `~/.agents`.** The skill selector links selected
+> skills into `skills/` at the root of this repo, so the checkout must live at
+> `~/.agents` for that directory to be `~/.agents/skills`, the path coding
+> agents read skills from. Cloned anywhere else, the links are created but
+> no agent sees them.
+>
+> ```bash
+> git clone <repository url> ~/.agents
+> ```
+
 A workspace for managing the skills exposed to coding agents. Skills are
 collected from skill libraries and custom sources, then selectively
 linked into place with a terminal UI.
@@ -67,8 +77,8 @@ files. See [Installing the skill selector](#installing-the-skill-selector)
 to set it up, then run `skills` from anywhere.
 
 The Skill Libraries panel lists every cloned library plus two built-in
-entries at the top. `All [built-in]`, selected on startup, combines the
-skills of every library into one list. `Currently selected [built-in]`,
+entries at the top. `All`, selected on startup, combines the
+skills of every library into one list. `Currently selected`,
 just beneath it, lists only the skills that are exposed right now, so it is
 the quickest way to review or prune your selection: turning a skill off
 there removes it from the list immediately, and toggle all turns everything

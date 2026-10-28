@@ -25,12 +25,16 @@ func IsLinked(dir, target string) (bool, error) {
 	return pointsAt(link, target)
 }
 
-// Link creates a symlink to target inside dir. The link stores target's
-// absolute path so it keeps working regardless of the working directory.
-// It fails if dir already has an entry with that name.
+// Link creates a symlink to target inside dir, creating dir first if it
+// does not exist. The link stores target's absolute path so it keeps working
+// regardless of the working directory. It fails if dir already has an entry
+// with that name.
 func Link(dir, target string) error {
 	abs, err := filepath.Abs(target)
 	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	return os.Symlink(abs, linkPath(dir, target))

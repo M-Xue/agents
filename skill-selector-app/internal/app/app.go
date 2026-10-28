@@ -20,11 +20,10 @@ const (
 	SelectedLibraryID = "*selected"
 )
 
-// Labels of the built-in libraries. The suffix marks them as provided by the
-// program rather than cloned from a repository.
+// Labels of the built-in libraries.
 const (
-	allLibraryLabel      = "All [built-in]"
-	selectedLibraryLabel = "Currently selected [built-in]"
+	allLibraryLabel      = "All"
+	selectedLibraryLabel = "Currently selected"
 )
 
 // IsBuiltIn reports whether id names one of the built-in libraries rather

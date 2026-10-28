@@ -16,7 +16,7 @@ import (
 // newModel builds a workspace with libraries alpha (skills apple, banana)
 // and beta (skill cherry), each with a distinctive SKILL.md, and returns a
 // sized model focused on the libraries panel. The library list is therefore
-// All [built-in], Currently selected [built-in], alpha, beta, with the
+// All, Currently selected, alpha, beta, with the
 // cursor on All at startup.
 func newModel(t *testing.T) (*Model, skills.Repo) {
 	t.Helper()
@@ -61,7 +61,7 @@ func TestStartupSelectsAllLibrariesAndFirstSkill(t *testing.T) {
 	v := view(m)
 	// All is first and current, so every library's skills are listed, each
 	// tagged with its library, and the first skill's file is shown.
-	for _, want := range []string{"All [built-in]", "Currently selected [built-in]", "alpha", "beta", "apple (alpha)", "banana (alpha)", "cherry (beta)", "APPLE SKILL BODY"} {
+	for _, want := range []string{"All", "Currently selected", "alpha", "beta", "apple (alpha)", "banana (alpha)", "cherry (beta)", "APPLE SKILL BODY"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q", want)
 		}
@@ -194,7 +194,7 @@ func TestSearchFilterMovesSelection(t *testing.T) {
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("bet")}) // libraries search
 	// All is filtered out like any other library, so beta is the only row
 	// left and is selected.
-	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") || strings.Contains(v, "built-in") {
+	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") || strings.Contains(v, "All") {
 		t.Fatal("filtering libraries did not select the surviving library")
 	}
 	press(m, tea.KeyRight)
@@ -432,7 +432,7 @@ func TestLettersTypeIntoSearchAndEsc(t *testing.T) {
 	if v := view(m); strings.Contains(v, "CHERRY SKILL BODY") {
 		t.Fatal("j moved the library cursor to beta")
 	}
-	if v := view(m); strings.Contains(v, "alpha") || strings.Contains(v, "beta") || strings.Contains(v, "built-in") {
+	if v := view(m); strings.Contains(v, "alpha") || strings.Contains(v, "beta") || strings.Contains(v, "All") {
 		t.Fatalf("typing jk did not filter the library list: %q", v)
 	}
 

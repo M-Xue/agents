@@ -300,8 +300,8 @@ tests or a future CLI without changes.
 - `New(repo)` lists the subdirectories of `repo.LibrariesDir()` once; each
   is a `Library` whose ID is its path and whose label is its name. The list
   always starts with two built-in libraries, views over the installed ones:
-  `All [built-in]` (`AllLibraryID`, `*all`) and
-  `Currently selected [built-in]` (`SelectedLibraryID`, `*selected`). The
+  `All` (`AllLibraryID`, `*all`) and
+  `Currently selected` (`SelectedLibraryID`, `*selected`). The
   IDs can never be directory paths; `IsBuiltIn(id)` tells them apart from
   installed libraries. All is first so a fresh start shows every skill.
 - `SelectLibrary(id)` lists the subdirectories of that library's skills
@@ -370,6 +370,8 @@ on how a check is performed:
 - `IsLinked(dir, target)` reports whether `dir` holds a symlink to the
   folder `target`.
 - `Link(dir, target)` creates that symlink, storing `target`'s absolute path.
+  It creates `dir` first if it is missing, since git does not track the
+  empty exposed directory and a fresh clone lacks it.
 - `Unlink(dir, target)` removes it.
 - `Blocker(dir, target)` reports what stops `Link` from succeeding: "" when
   the name is free or already links to `target`, the destination of a
