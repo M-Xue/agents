@@ -16,10 +16,10 @@ as a local library to pull skills from rather than something committed to this
 repo. Run `update_skill_libraries.sh` to pull the latest changes for every
 cloned library.
 
-Each clone is independent: if one fails (for example because the directory
-already exists from an earlier run, or the network is unavailable), the script
-prints a warning to stderr and carries on with the remaining libraries rather
-than aborting.
+Both scripts treat each library independently: if a clone or update fails
+(for example because the directory already exists from an earlier run, or the
+network is unavailable), the script prints a warning to stderr and carries on
+with the remaining libraries rather than aborting.
 
 ### Adding new skill libraries
 
