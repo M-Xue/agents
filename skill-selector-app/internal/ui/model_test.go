@@ -16,7 +16,8 @@ import (
 // newModel builds a workspace with libraries alpha (skills apple, banana)
 // and beta (skill cherry), each with a distinctive SKILL.md, and returns a
 // sized model focused on the libraries panel. The library list is therefore
-// All [built-in], alpha, beta, with the cursor on All at startup.
+// All [built-in], Currently selected [built-in], alpha, beta, with the
+// cursor on All at startup.
 func newModel(t *testing.T) (*Model, skills.Repo) {
 	t.Helper()
 	root := t.TempDir()
@@ -60,7 +61,7 @@ func TestStartupSelectsAllLibrariesAndFirstSkill(t *testing.T) {
 	v := view(m)
 	// All is first and current, so every library's skills are listed, each
 	// tagged with its library, and the first skill's file is shown.
-	for _, want := range []string{"All [built-in]", "alpha", "beta", "apple (alpha)", "banana (alpha)", "cherry (beta)", "APPLE SKILL BODY"} {
+	for _, want := range []string{"All [built-in]", "Currently selected [built-in]", "alpha", "beta", "apple (alpha)", "banana (alpha)", "cherry (beta)", "APPLE SKILL BODY"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q", want)
 		}
@@ -72,7 +73,8 @@ func TestStartupSelectsAllLibrariesAndFirstSkill(t *testing.T) {
 
 func TestLibraryCursorSwapsSkillsAndDetails(t *testing.T) {
 	m, _ := newModel(t)
-	press(m, tea.KeyDown) // libraries: All -> alpha
+	press(m, tea.KeyDown) // libraries: All -> Currently selected
+	press(m, tea.KeyDown) // Currently selected -> alpha
 	v := view(m)
 	if !strings.Contains(v, "APPLE SKILL BODY") || strings.Contains(v, "cherry") {
 		t.Fatal("alpha's skills not shown alone after moving library cursor")
@@ -117,17 +119,24 @@ func TestAllLibraryKeepsCursorAndToggles(t *testing.T) {
 	}
 
 	// Moving the library cursor from All to the skill's own library keeps the
-	// cursor on that skill, since its ID is present in both lists.
+	// cursor on that skill, since its ID is present in both lists. The jump
+	// is made by click so the Currently selected row in between, which lists
+	// only cherry, is not visited.
 	press(m, tea.KeyUp)   // cherry -> banana
 	press(m, tea.KeyLeft) // focus libraries (All)
-	press(m, tea.KeyDown) // All -> alpha
+	firstRow := verticalPadding + panelTopRows + 1 + listTopPadding + searchRows
+	libX := horizontalPadding + 1
+	click(m, libX, firstRow+2) // alpha
+	if sel, _ := m.libraries.Selected(); sel.Label != "alpha" {
+		t.Fatalf("click did not land on alpha: %q", sel.Label)
+	}
 	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "banana") {
 		t.Fatalf("library change lost the skill cursor: on %q", sel.ID)
 	}
 	if v := view(m); !strings.Contains(v, "BANANA SKILL BODY") {
 		t.Fatal("details did not stay on banana")
 	}
-	press(m, tea.KeyUp) // alpha -> All
+	click(m, libX, firstRow) // All
 	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "banana") {
 		t.Fatalf("returning to All lost the skill cursor: on %q", sel.ID)
 	}
@@ -313,16 +322,16 @@ func TestClickSelectsRowInFocusedPanel(t *testing.T) {
 		return err == nil && fi.Mode()&os.ModeSymlink != 0
 	}
 
-	// Libraries is focused: clicking its third row (All, alpha, beta)
-	// selects beta.
-	click(m, libX, firstRow+2)
+	// Libraries is focused: clicking its fourth row (All, Currently
+	// selected, alpha, beta) selects beta.
+	click(m, libX, firstRow+3)
 	if sel, _ := m.libraries.Selected(); sel.Label != "beta" {
 		t.Fatalf("click did not select beta: %q", sel.Label)
 	}
 	if v := view(m); !strings.Contains(v, "CHERRY SKILL BODY") {
 		t.Fatal("selecting beta by click did not load its skills")
 	}
-	click(m, libX, firstRow+1) // alpha
+	click(m, libX, firstRow+2) // alpha
 	if v := view(m); !strings.Contains(v, "APPLE SKILL BODY") || strings.Contains(v, "cherry") {
 		t.Fatal("click on alpha did not load its skills alone")
 	}
@@ -439,7 +448,8 @@ func TestLettersTypeIntoSearchAndEsc(t *testing.T) {
 
 func TestToggleAll(t *testing.T) {
 	m, repo := newModel(t)
-	press(m, tea.KeyDown)  // libraries: All -> alpha
+	press(m, tea.KeyDown)  // libraries: All -> Currently selected
+	press(m, tea.KeyDown)  // Currently selected -> alpha
 	press(m, tea.KeyRight) // skills: apple, banana
 	linked := func(name string) bool {
 		fi, err := os.Lstat(filepath.Join(repo.ExposedDir(), name))
@@ -523,15 +533,17 @@ func TestToggleAllTreatsShadowedAsToggled(t *testing.T) {
 	if items[0].Label != "apple (alpha)" {
 		t.Fatalf("unshadowed label = %q", items[0].Label)
 	}
-	// Outside All the suffix follows the bare name.
+	// Outside the built-in libraries the suffix follows the bare name.
 	press(m, tea.KeyLeft) // libraries
-	press(m, tea.KeyDown) // All -> alpha
+	press(m, tea.KeyDown) // All -> Currently selected
+	press(m, tea.KeyDown) // Currently selected -> alpha
 	press(m, tea.KeyDown) // alpha -> beta
 	if sel, _ := m.skills.Selected(); sel.Label != "apple "+shadowedSuffix {
 		t.Fatalf("shadowed label in beta = %q", sel.Label)
 	}
-	press(m, tea.KeyUp)    // beta -> alpha
-	press(m, tea.KeyUp)    // alpha -> All
+	for range 3 {
+		press(m, tea.KeyUp) // back to All
+	}
 	press(m, tea.KeyRight) // back to skills
 
 	// Every row is selected or shadowed: the next sweep deselects all.
@@ -611,11 +623,11 @@ func TestTabMovesAndArrowsCyclePanels(t *testing.T) {
 	// focus; the library change flows through to the other panels.
 	press(m, tea.KeyTab)
 	expectFocus("tab", panelLibraries)
-	if sel, _ := m.libraries.Selected(); sel.Label != "alpha" {
+	if sel, _ := m.libraries.Selected(); sel.ID != app.SelectedLibraryID {
 		t.Fatalf("tab did not move down: on %q", sel.Label)
 	}
-	if v := view(m); strings.Contains(v, "cherry") {
-		t.Fatal("tab did not load alpha's skills alone")
+	if v := view(m); !strings.Contains(v, "No skill selected") {
+		t.Fatal("Currently selected with nothing linked did not show the empty state")
 	}
 	press(m, tea.KeyShiftTab)
 	if sel, _ := m.libraries.Selected(); sel.ID != app.AllLibraryID {
@@ -651,5 +663,80 @@ func TestTabMovesAndArrowsCyclePanels(t *testing.T) {
 
 	if m.libSearch.Value() != "" || m.search.Value() != "" {
 		t.Fatalf("search values changed: %q %q", m.libSearch.Value(), m.search.Value())
+	}
+}
+
+func TestSelectedLibraryDropsHiddenSkills(t *testing.T) {
+	m, repo := newModel(t)
+	linked := func(name string) bool {
+		fi, err := os.Lstat(filepath.Join(repo.ExposedDir(), name))
+		return err == nil && fi.Mode()&os.ModeSymlink != 0
+	}
+
+	// Expose apple and cherry from the All view.
+	press(m, tea.KeyRight) // skills: apple, banana, cherry
+	press(m, tea.KeyEnter) // apple on
+	press(m, tea.KeyDown)
+	press(m, tea.KeyDown)
+	press(m, tea.KeyEnter) // cherry on
+	if !linked("apple") || !linked("cherry") || linked("banana") {
+		t.Fatal("setup links wrong")
+	}
+
+	// Currently selected lists exactly those two, with library tags, and the
+	// cursor stays on cherry since its ID survives.
+	press(m, tea.KeyLeft)
+	press(m, tea.KeyDown) // All -> Currently selected
+	items := m.skills.Items()
+	if len(items) != 2 || items[0].Label != "apple (alpha)" || items[1].Label != "cherry (beta)" {
+		t.Fatalf("selected view rows = %+v", items)
+	}
+	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "cherry") {
+		t.Fatalf("cursor moved to %q", sel.ID)
+	}
+
+	// Hiding cherry removes its row at once; the cursor moves to the row
+	// now at the end (apple) and the details follow.
+	press(m, tea.KeyRight)
+	press(m, tea.KeyEnter)
+	if linked("cherry") {
+		t.Fatal("enter did not hide cherry")
+	}
+	if items := m.skills.Items(); len(items) != 1 || items[0].Label != "apple (alpha)" {
+		t.Fatalf("rows after hiding cherry = %+v", items)
+	}
+	if v := view(m); !strings.Contains(v, "APPLE SKILL BODY") || strings.Contains(v, "cherry") {
+		t.Fatal("details or list did not update after hiding cherry")
+	}
+	// Hiding the last one empties the view.
+	press(m, tea.KeyEnter)
+	if linked("apple") || m.skills.Len() != 0 {
+		t.Fatalf("apple linked=%v rows=%d after hiding", linked("apple"), m.skills.Len())
+	}
+	if v := view(m); !strings.Contains(v, "No skill selected") {
+		t.Fatal("empty state not shown")
+	}
+	if m.status != "" {
+		t.Fatalf("unexpected status %q", m.status)
+	}
+
+	// A hidden row in the middle leaves the cursor on the row that takes
+	// its place: expose all three, hide banana, land on cherry.
+	press(m, tea.KeyLeft)
+	press(m, tea.KeyUp) // All
+	press(m, tea.KeyRight)
+	press(m, tea.KeyCtrlA) // all three on
+	press(m, tea.KeyLeft)
+	press(m, tea.KeyDown) // Currently selected: apple, banana, cherry
+	press(m, tea.KeyRight)
+	press(m, tea.KeyDown)  // banana
+	press(m, tea.KeyEnter) // banana off
+	if sel, _ := m.skills.Selected(); !strings.HasSuffix(sel.ID, "cherry") || m.skills.Cursor() != 1 {
+		t.Fatalf("cursor after hiding the middle row: %q at %d", sel.ID, m.skills.Cursor())
+	}
+	// Toggle all here means deselect all: every row is selected.
+	press(m, tea.KeyCtrlA)
+	if linked("apple") || linked("cherry") || m.skills.Len() != 0 {
+		t.Fatal("toggle all in Currently selected did not hide everything")
 	}
 }

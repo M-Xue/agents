@@ -56,7 +56,7 @@ skill-selector-app/
     │   └── fuzzy.go
     ├── app/                    general business logic, coordinates skills + files
     │   ├── doc.go
-    │   └── app.go              App: libraries, skills of the current library, toggle links
+    │   └── app.go              App: libraries (incl. built-in All and Currently selected), skills, toggle links
     ├── skills/                 describes the workspace layout
     │   ├── doc.go
     │   └── skill.go            Repo: FindRoot, ExposedDir, LibrariesDir, LibrarySkillsDir, SkillFile
@@ -171,10 +171,19 @@ is selected automatically and its file appears in Details. Moving between an
 installed library and the built-in All library is the exception: the skill
 under the cursor exists in both lists, so the cursor stays on it.
 
-While All is current, `syncSkills` labels each row `name (library)` via
-`skillLabel`, since libraries can share skill names. The fuzzy filter runs
-over that whole label, so typing a library name narrows the list to its
-skills. Outside All the label is the bare skill name.
+While a built-in library is current, `syncSkills` labels each row
+`name (library)` via `skillLabel`, since those views mix libraries that can
+share skill names. The fuzzy filter runs over that whole label, so typing a
+library name narrows the list to its skills. In an installed library the
+label is the bare skill name.
+
+Toggling goes through `toggleUnderCursor`, shared by enter and the mouse. In
+Currently selected a hidden skill drops out of the checklist on the
+`syncSkills` that follows, and because its ID is gone the checklist would
+snap to the top; `toggleUnderCursor` instead puts the cursor back at the same
+index, clamped to the last row, so hiding several skills in a row behaves
+like deleting from a list. Toggle all there always means hide everything,
+since every row shown is selected.
 
 `internal/fuzzy` is a pure utility with no UI or app knowledge. `Match` is a
 case-insensitive subsequence test that ignores spaces in the query, so
@@ -290,17 +299,24 @@ tests or a future CLI without changes.
 
 - `New(repo)` lists the subdirectories of `repo.LibrariesDir()` once; each
   is a `Library` whose ID is its path and whose label is its name. The list
-  always starts with the built-in combined library, labelled
-  `All [built-in]`, whose ID is the constant `AllLibraryID` (`*`, which can
-  never be a directory path). It is first so a fresh start shows every skill.
+  always starts with two built-in libraries, views over the installed ones:
+  `All [built-in]` (`AllLibraryID`, `*all`) and
+  `Currently selected [built-in]` (`SelectedLibraryID`, `*selected`). The
+  IDs can never be directory paths; `IsBuiltIn(id)` tells them apart from
+  installed libraries. All is first so a fresh start shows every skill.
 - `SelectLibrary(id)` lists the subdirectories of that library's skills
   directory; each is a `Skill` whose ID is its path and whose `Library`
   field names the library it came from. An unknown or empty ID clears the
   list. A library with no skills directory yields an empty list and an error
-  for the UI to report. Selecting `AllLibraryID` loads every installed
+  for the UI to report. Selecting a built-in library loads every installed
   library's skills, sorted by skill name and then library name so same-named
   skills sit together; a library that cannot be listed is skipped, the others
   still load, and the failures come back as one error.
+- `Skills()` returns the loaded list, except while Currently selected is
+  current: then it keeps only the skills that `IsSelected` reports exposed,
+  checked against the disk on each call. A skill hidden a moment ago is
+  therefore gone from the next call without re-selecting the library, and
+  one linked outside the program appears.
 - `IsSelected(id)` asks `files.IsLinked` whether the skill is linked into
   `repo.ExposedDir()`. It is read from disk on every call, so links made or
   removed outside the program are reflected immediately.

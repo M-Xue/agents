@@ -66,12 +66,15 @@ toggling a skill on or off only adds or removes a link rather than copying
 files. See [Installing the skill selector](#installing-the-skill-selector)
 to set it up, then run `skills` from anywhere.
 
-The Skill Libraries panel lists every cloned library plus a built-in
-`All [built-in]` entry at the top, which is selected on startup. It combines
-the skills of every library into one list, with each skill tagged with its
-library name since different libraries can ship skills with the same name.
-Searching in that view matches library names too, so typing a library's name
-narrows the list to its skills.
+The Skill Libraries panel lists every cloned library plus two built-in
+entries at the top. `All [built-in]`, selected on startup, combines the
+skills of every library into one list. `Currently selected [built-in]`,
+just beneath it, lists only the skills that are exposed right now, so it is
+the quickest way to review or prune your selection: turning a skill off
+there removes it from the list immediately, and toggle all turns everything
+off. In both views each skill is tagged with its library name, since
+different libraries can ship skills with the same name, and searching matches
+library names too, so typing a library's name narrows the list to its skills.
 
 Because a skill is exposed under its directory name, only one skill of a
 given name can be on at a time. When one is, the same-named skills in other

@@ -33,6 +33,18 @@ func newWorkspace(t *testing.T) skills.Repo {
 	return skills.Repo{Root: root}
 }
 
+// lib returns the ID of the library with the given label.
+func lib(t *testing.T, a *App, label string) string {
+	t.Helper()
+	for _, l := range a.Libraries() {
+		if l.Label == label {
+			return l.ID
+		}
+	}
+	t.Fatalf("no library labelled %q", label)
+	return ""
+}
+
 func labels[T interface{ Library | Skill }](xs []T) string {
 	parts := make([]string, 0, len(xs))
 	for _, x := range xs {
@@ -51,16 +63,16 @@ func TestLibrariesAndSkills(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := labels(a.Libraries()); got != "All [built-in],alpha,beta,empty" {
+	if got := labels(a.Libraries()); got != "All [built-in],Currently selected [built-in],alpha,beta,empty" {
 		t.Fatalf("Libraries = %s", got)
 	}
-	if a.Libraries()[0].ID != AllLibraryID {
-		t.Fatalf("first library ID = %q, want AllLibraryID", a.Libraries()[0].ID)
+	if a.Libraries()[0].ID != AllLibraryID || a.Libraries()[1].ID != SelectedLibraryID {
+		t.Fatalf("built-in IDs = %q, %q", a.Libraries()[0].ID, a.Libraries()[1].ID)
 	}
 	if len(a.Skills()) != 0 {
 		t.Fatal("skills before any library is selected")
 	}
-	if err := a.SelectLibrary(a.Libraries()[1].ID); err != nil {
+	if err := a.SelectLibrary(lib(t, a, "alpha")); err != nil {
 		t.Fatal(err)
 	}
 	if got := labels(a.Skills()); got != "one,two" {
@@ -71,7 +83,7 @@ func TestLibrariesAndSkills(t *testing.T) {
 			t.Fatalf("skill %s has Library %q, want alpha", sk.Label, sk.Library)
 		}
 	}
-	if err := a.SelectLibrary(a.Libraries()[3].ID); err == nil {
+	if err := a.SelectLibrary(lib(t, a, "empty")); err == nil {
 		t.Fatal("expected error for library without skills dir")
 	}
 	if len(a.Skills()) != 0 {
@@ -88,7 +100,7 @@ func TestToggleAndClash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = a.SelectLibrary(a.Libraries()[1].ID) // alpha
+	_ = a.SelectLibrary(lib(t, a, "alpha"))
 	one := a.Skills()[0]
 
 	if a.IsSelected(one.ID) {
@@ -107,7 +119,7 @@ func TestToggleAndClash(t *testing.T) {
 
 	// beta/one clashes with the exposed alpha/one: it is not selected, and
 	// toggling it must fail rather than replace alpha's link.
-	_ = a.SelectLibrary(a.Libraries()[2].ID) // beta
+	_ = a.SelectLibrary(lib(t, a, "beta"))
 	betaOne := a.Skills()[0]
 	if a.IsSelected(betaOne.ID) {
 		t.Fatal("beta/one reported selected via alpha's link")
@@ -150,7 +162,7 @@ func TestForeignEntryShadows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = a.SelectLibrary(a.Libraries()[1].ID) // alpha
+	_ = a.SelectLibrary(lib(t, a, "alpha"))
 	one := a.Skills()[0]
 	taken := filepath.Join(repo.ExposedDir(), "one")
 	if err := os.Mkdir(taken, 0o755); err != nil {
@@ -170,7 +182,7 @@ func TestSkillFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = a.SelectLibrary(a.Libraries()[1].ID) // alpha
+	_ = a.SelectLibrary(lib(t, a, "alpha"))
 	if got := a.SkillFile(a.Skills()[0].ID); got != "# one\n" {
 		t.Fatalf("SkillFile(one) = %q", got)
 	}
@@ -187,7 +199,7 @@ func TestSetSelectedIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = a.SelectLibrary(a.Libraries()[1].ID) // alpha
+	_ = a.SelectLibrary(lib(t, a, "alpha"))
 	id := a.Skills()[0].ID
 	for i := 0; i < 2; i++ {
 		if err := a.SetSelected(id, true); err != nil {
@@ -249,10 +261,66 @@ func TestSelectAllCombinesLibraries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := labels(b.Libraries()); got != "All [built-in]" {
+	if got := labels(b.Libraries()); got != "All [built-in],Currently selected [built-in]" {
 		t.Fatalf("Libraries = %s", got)
 	}
 	if err := b.SelectLibrary(AllLibraryID); err != nil || len(b.Skills()) != 0 {
 		t.Fatalf("SelectLibrary(All) on empty workspace = %v, %d skills", err, len(b.Skills()))
+	}
+}
+
+func TestSelectedLibraryTracksLinksLive(t *testing.T) {
+	a, err := New(newWorkspace(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Nothing exposed: the view is empty but not an error about alpha/beta
+	// (only "empty" is reported, as for All).
+	err = a.SelectLibrary(SelectedLibraryID)
+	if err == nil || !strings.Contains(err.Error(), "empty") {
+		t.Fatalf("SelectLibrary(Selected) error = %v", err)
+	}
+	if n := len(a.Skills()); n != 0 {
+		t.Fatalf("%d skills selected before any link", n)
+	}
+
+	// Expose alpha/two and beta/one from another view; they appear in the
+	// selected view without re-selecting it, each tagged with its library.
+	_ = a.SelectLibrary(AllLibraryID)
+	var alphaTwo, betaOne string
+	for _, s := range a.Skills() {
+		switch s.Label + "/" + s.Library {
+		case "two/alpha":
+			alphaTwo = s.ID
+		case "one/beta":
+			betaOne = s.ID
+		}
+	}
+	for _, id := range []string{alphaTwo, betaOne} {
+		if err := a.SetSelected(id, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = a.SelectLibrary(SelectedLibraryID)
+	got := make([]string, 0, 2)
+	for _, s := range a.Skills() {
+		got = append(got, s.Label+"/"+s.Library)
+	}
+	if want := "one/beta,two/alpha"; strings.Join(got, ",") != want {
+		t.Fatalf("selected skills = %s, want %s", strings.Join(got, ","), want)
+	}
+
+	// Hiding one removes it from the very next Skills call.
+	if err := a.SetSelected(betaOne, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := labels(a.Skills()); got != "two" {
+		t.Fatalf("selected skills after hiding beta/one = %s", got)
+	}
+	if err := a.SetSelected(alphaTwo, false); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(a.Skills()); n != 0 {
+		t.Fatalf("%d skills still listed after hiding all", n)
 	}
 }

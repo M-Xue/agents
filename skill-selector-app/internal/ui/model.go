@@ -195,11 +195,12 @@ func (m *Model) syncSkills() {
 const shadowedSuffix = "[skill with same name already exists]"
 
 // skillLabel is the checklist row text for a skill: its name, followed by
-// its library in parentheses while the All library is current, followed by
-// shadowedSuffix when the skill is shadowed.
+// its library in parentheses while a built-in library is current (since
+// those mix libraries), followed by shadowedSuffix when the skill is
+// shadowed.
 func (m *Model) skillLabel(s app.Skill, shadowed bool) string {
 	label := s.Label
-	if m.libraryID == app.AllLibraryID {
+	if app.IsBuiltIn(m.libraryID) {
 		label += " (" + s.Library + ")"
 	}
 	if shadowed {
@@ -289,12 +290,28 @@ func (m *Model) clickRow(id panelID, y int) {
 			}
 			return
 		}
-		if sel, ok := m.skills.Selected(); ok {
-			if err := m.app.ToggleSkill(sel.ID); err != nil {
-				m.status = err.Error()
-			}
-			m.syncSkills()
-		}
+		m.toggleUnderCursor()
+	}
+}
+
+// toggleUnderCursor flips the link of the skill under the Skills cursor,
+// reporting a failure in the footer, and rebuilds the checklist. In the
+// Currently selected library a hidden skill leaves the list, so the cursor
+// is kept at the same index (clamped to the end) rather than letting the
+// checklist snap it to the top when its ID is gone.
+func (m *Model) toggleUnderCursor() {
+	sel, ok := m.skills.Selected()
+	if !ok {
+		return
+	}
+	idx := m.skills.Cursor()
+	if err := m.app.ToggleSkill(sel.ID); err != nil {
+		m.status = err.Error()
+	}
+	m.syncSkills()
+	if m.libraryID == app.SelectedLibraryID && m.skills.Cursor() != idx {
+		m.skills.Select(min(idx, m.skills.Len()-1))
+		m.syncDetails()
 	}
 }
 
@@ -395,12 +412,7 @@ func (m *Model) updateSkills(msg tea.KeyMsg) {
 		m.skills.MoveDown()
 		m.syncDetails()
 	case key.Matches(msg, m.keys.Toggle):
-		if sel, ok := m.skills.Selected(); ok {
-			if err := m.app.ToggleSkill(sel.ID); err != nil {
-				m.status = err.Error()
-			}
-			m.syncSkills()
-		}
+		m.toggleUnderCursor()
 	case key.Matches(msg, m.keys.ToggleAll):
 		m.toggleAll()
 		m.syncSkills()

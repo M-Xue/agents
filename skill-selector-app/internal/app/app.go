@@ -10,21 +10,34 @@ import (
 	"github.com/maxx/skill-selector-app/internal/skills"
 )
 
-// AllLibraryID is the ID of the built-in library that combines the skills of
-// every installed library. It is not a path, so it can never collide with a
-// real library's directory.
-const AllLibraryID = "*"
+// The built-in libraries are views over the installed ones. Their IDs are
+// not paths, so they can never collide with a real library's directory.
+const (
+	// AllLibraryID combines the skills of every installed library.
+	AllLibraryID = "*all"
+	// SelectedLibraryID lists only the skills currently exposed to the
+	// agent, from whichever library they come.
+	SelectedLibraryID = "*selected"
+)
 
-// allLibraryLabel is how the built-in combined library is displayed. The
-// suffix marks it as provided by the program rather than cloned from a
-// repository.
-const allLibraryLabel = "All [built-in]"
+// Labels of the built-in libraries. The suffix marks them as provided by the
+// program rather than cloned from a repository.
+const (
+	allLibraryLabel      = "All [built-in]"
+	selectedLibraryLabel = "Currently selected [built-in]"
+)
 
-// Library is one skill library: a directory of skills, or the built-in
-// combination of all of them.
+// IsBuiltIn reports whether id names one of the built-in libraries rather
+// than an installed one.
+func IsBuiltIn(id string) bool {
+	return id == AllLibraryID || id == SelectedLibraryID
+}
+
+// Library is one skill library: a directory of skills, or a built-in view
+// over all of them.
 type Library struct {
 	// ID is the library's directory path, unique across the workspace, or
-	// AllLibraryID for the built-in combined library.
+	// one of the built-in IDs.
 	ID string
 	// Label is the directory name, for display.
 	Label string
@@ -54,15 +67,18 @@ type App struct {
 
 // New loads the libraries of the workspace. It fails if the libraries
 // directory cannot be listed; a workspace with no libraries installed is
-// valid and yields an App with only the built-in combined library. That
-// library is always first in the list.
+// valid and yields an App with only the built-in libraries. Those are
+// always first in the list: All, then Currently selected.
 func New(repo skills.Repo) (*App, error) {
 	dirs, err := files.ListDirs(repo.LibrariesDir())
 	if err != nil {
 		return nil, fmt.Errorf("listing skill libraries: %w", err)
 	}
 	a := &App{repo: repo}
-	a.libraries = append(a.libraries, Library{ID: AllLibraryID, Label: allLibraryLabel})
+	a.libraries = append(a.libraries,
+		Library{ID: AllLibraryID, Label: allLibraryLabel},
+		Library{ID: SelectedLibraryID, Label: selectedLibraryLabel},
+	)
 	for _, d := range dirs {
 		a.libraries = append(a.libraries, Library{ID: d, Label: filepath.Base(d)})
 	}
@@ -70,7 +86,7 @@ func New(repo skills.Repo) (*App, error) {
 }
 
 // Libraries returns the known skill libraries in display order: the
-// built-in combined library, then the installed libraries by name.
+// built-in libraries, then the installed libraries by name.
 func (a *App) Libraries() []Library {
 	return append([]Library(nil), a.libraries...)
 }
@@ -80,18 +96,19 @@ func (a *App) Libraries() []Library {
 // without a skills directory yields an empty list and an error describing
 // why, so the caller can report it while the UI stays consistent.
 //
-// Selecting AllLibraryID loads the skills of every installed library, sorted
-// by skill name and then library name so skills that share a name sit
-// together. A library whose skills cannot be listed is skipped and the
+// Selecting a built-in library loads the skills of every installed library,
+// sorted by skill name and then library name so skills that share a name
+// sit together. A library whose skills cannot be listed is skipped and the
 // skills of the others are still loaded; the failures are returned as one
-// error.
+// error. For SelectedLibraryID, Skills then narrows that list to the skills
+// exposed at the time it is called.
 func (a *App) SelectLibrary(id string) error {
 	a.library = id
 	a.skills = nil
-	switch id {
-	case "":
+	if id == "" {
 		return nil
-	case AllLibraryID:
+	}
+	if IsBuiltIn(id) {
 		return a.loadAll()
 	}
 	skills, err := a.loadLibrary(id)
@@ -117,7 +134,7 @@ func (a *App) loadLibrary(id string) ([]Skill, error) {
 func (a *App) loadAll() error {
 	var failures []string
 	for _, lib := range a.libraries {
-		if lib.ID == AllLibraryID {
+		if IsBuiltIn(lib.ID) {
 			continue
 		}
 		skills, err := a.loadLibrary(lib.ID)
@@ -139,9 +156,22 @@ func (a *App) loadAll() error {
 	return nil
 }
 
-// Skills returns the skills of the current library in display order.
+// Skills returns the skills of the current library in display order. While
+// the Currently selected library is current, only the skills exposed right
+// now are returned: the check is made against the disk on every call, so a
+// skill that has just been hidden disappears from the next call and one
+// linked outside the program appears.
 func (a *App) Skills() []Skill {
-	return append([]Skill(nil), a.skills...)
+	if a.library != SelectedLibraryID {
+		return append([]Skill(nil), a.skills...)
+	}
+	var selected []Skill
+	for _, s := range a.skills {
+		if a.IsSelected(s.ID) {
+			selected = append(selected, s)
+		}
+	}
+	return selected
 }
 
 // IsSelected reports whether the skill with the given ID is exposed to the
@@ -183,7 +213,7 @@ func (a *App) shadow(id string) (by string, library bool, err error) {
 // contains path, or "" when path is not a skill of an installed library.
 func (a *App) libraryOf(path string) string {
 	for _, lib := range a.libraries {
-		if lib.ID == AllLibraryID {
+		if IsBuiltIn(lib.ID) {
 			continue
 		}
 		rel, err := filepath.Rel(a.repo.LibrarySkillsDir(lib.ID), path)
