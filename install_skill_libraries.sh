@@ -20,5 +20,6 @@ fi
 clone https://github.com/addyosmani/agent-skills.git skill-libraries/addy-skills
 clone https://github.com/DietrichGebert/ponytail.git skill-libraries/ponytail
 clone https://github.com/obra/superpowers.git skill-libraries/superpowers
+clone https://github.com/t3dotgg/tstack.git skill-libraries/tstack
 clone https://github.com/M-Xue/skills.git skill-libraries/max-skills
 clone https://github.com/canvanauts/maxx-canva-skills.git skill-libraries/max-canva-skills
