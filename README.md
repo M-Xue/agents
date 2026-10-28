@@ -16,15 +16,23 @@ as a local library to pull skills from rather than something committed to this
 repo. Run `update_skill_libraries.sh` to pull the latest changes for every
 cloned library.
 
+Each clone is independent: if one fails (for example because the directory
+already exists from an earlier run, or the network is unavailable), the script
+prints a warning to stderr and carries on with the remaining libraries rather
+than aborting.
+
 ### Adding new skill libraries
 
 A skill library is a git repository with a `skills/` folder at the root of the
-directory. To add a library, add a `git clone` line to
+directory. To add a library, add a `clone` line to
 `install_skill_libraries.sh` in the following structure:
 
 ```sh
-git clone <repository url> skill-libraries/<name of library>
+clone <repository url> skill-libraries/<name of library>
 ```
+
+`clone` is a small helper defined at the top of the script that wraps
+`git clone` and turns a failure into a warning instead of a hard stop.
 
 ### Expected layout
 
