@@ -2,9 +2,12 @@
 
 > **Clone this repo to `~/.agents`.** The skill selector links selected
 > skills into `skills/` at the root of this repo, so the checkout must live at
-> `~/.agents` for that directory to be `~/.agents/skills`, the path coding
-> agents read skills from. Cloned anywhere else, the links are created but
-> no agent sees them.
+> `~/.agents` for that directory to be `~/.agents/skills`, the path most
+> coding agents read skills from. Cloned anywhere else, the links are created
+> but those agents do not see them. Claude Code is the exception: it reads
+> `~/.claude/skills` only, so the selector's installer points that directory
+> at this repo's `skills/` (see [Installing the skill
+> selector](#installing-the-skill-selector)).
 >
 > ```bash
 > git clone <repository url> ~/.agents
@@ -116,6 +119,25 @@ directories no matter where you run it from. If `~/.local/bin` is not already
 on your `PATH`, the script tells you the line to add to your shell startup
 file.
 
+The installer also wires up Claude Code by running
+`skill-selector-app/link_claude_skills.sh`. Claude Code loads personal skills
+from `~/.claude/skills` and does not scan `~/.agents/skills`, so that script
+replaces `~/.claude/skills` with a symlink to this repo's `skills/`
+directory. Every skill you expose with the selector is then available in
+Claude Code too. If `~/.claude/skills` already holds skills, they are moved
+to `~/.claude/skills-old` rather than deleted; link the ones you still want
+back into `skills/`, or re-link them from a library, and delete the old
+directory when you are done. An empty `~/.claude/skills` is simply removed.
+Set `$CLAUDE_DIR` to use a Claude config directory other than `~/.claude`.
+The step is skipped when the link is already in place, and it refuses to run
+if both a real `~/.claude/skills` and a `~/.claude/skills-old` exist, so a
+previous backup is never overwritten. The script can also be run on its own,
+without rebuilding the selector:
+
+```bash
+sh skill-selector-app/link_claude_skills.sh
+```
+
 When started inside a different checkout of this repo, the selector prefers
 that checkout over the compiled-in one, and `skills -root <path>`
 overrides both.
@@ -134,4 +156,7 @@ sh skill-selector-app/uninstall.sh
 This removes the binary `install.sh` created. It honors the same `$BIN_DIR`
 override, so export it again here if you set it at install time. The symlinks
 in `skills/` are your selection, not part of the program, and are left in
-place; remove them with the selector itself or by hand.
+place; remove them with the selector itself or by hand. The
+`~/.claude/skills` link is left in place too, so Claude Code keeps seeing the
+skills in `skills/`; remove it and restore `~/.claude/skills-old` by hand if
+you want the previous layout back.

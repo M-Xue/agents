@@ -10,10 +10,16 @@ The `main` package lives at the module root, so a plain `go build` in this
 directory produces `./skill-selector-app`. For day-to-day use run the
 installer instead, which builds the binary to `~/.local/bin/skills`
 (honouring `$BIN_DIR`) and compiles in the path of the workspace this checkout
-belongs to, so the command works from any directory:
+belongs to, so the command works from any directory. It then runs
+`link_claude_skills.sh`, which replaces `~/.claude/skills` (honouring
+`$CLAUDE_DIR`) with a symlink to the workspace's exposed `skills/` directory,
+since Claude Code reads only that path; an existing directory is moved to
+`~/.claude/skills-old` first, and the step is a no-op once the link exists.
+That script can also be run on its own:
 
 ```
 sh install.sh
+sh link_claude_skills.sh
 sh uninstall.sh
 ```
 
@@ -28,7 +34,8 @@ skill-selector-app/
 ├── go.mod                      module github.com/maxx/skill-selector-app
 ├── .gitignore
 ├── main.go                     entry point: finds the workspace, wires packages together
-├── install.sh                  build to $BIN_DIR as `skills` with the workspace path compiled in
+├── install.sh                  build to $BIN_DIR as `skills`, then run link_claude_skills.sh
+├── link_claude_skills.sh       replace ~/.claude/skills with a symlink to the exposed dir
 ├── uninstall.sh                remove that binary
 └── internal/
     ├── ui/                     Bubble Tea TUI (model, update, view)

@@ -1,10 +1,11 @@
 #!/bin/sh
 
 # Builds the skill selector and installs it to $BIN_DIR (default ~/.local/bin)
-# as the `skills` command.
+# as the `skills` command, then runs link_claude_skills.sh so Claude Code reads
+# this workspace's skills/ directory.
 # The agents workspace this checkout lives in is compiled into the binary, so
 # the installed command works from any directory. It is safe to re-run: each
-# run rebuilds into the same location.
+# run rebuilds into the same location and leaves an existing link alone.
 
 set -eu
 
@@ -37,6 +38,9 @@ mkdir -p "$BIN_DIR"
 chmod +x "$BINARY_PATH"
 
 printf '%s\n' "installed skills to $BINARY_PATH (workspace: $workspace_root)"
+
+# Make the exposed skills visible to Claude Code; see that script for details.
+sh "$app_dir/link_claude_skills.sh"
 
 case ":${PATH:-}:" in
     *":$BIN_DIR:"*)
