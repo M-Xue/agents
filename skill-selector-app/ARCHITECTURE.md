@@ -15,7 +15,11 @@ belongs to, so the command works from any directory. It then runs
 `$CLAUDE_DIR`) with a symlink to the workspace's exposed `skills/` directory,
 since Claude Code reads only that path; an existing directory is moved to
 `~/.claude/skills-old` first, and the step is a no-op once the link exists.
-That script can also be run on its own:
+The same script links `~/.claude/CLAUDE.md` to the workspace's `AGENTS.md`,
+adopting an existing `CLAUDE.md` as `AGENTS.md` when the latter is missing,
+creating an empty `AGENTS.md` when neither exists, and otherwise backing the
+old file up to `~/.claude/CLAUDE.md-old`. That script can also be run on its
+own:
 
 ```
 sh install.sh
@@ -35,7 +39,7 @@ skill-selector-app/
 ├── .gitignore
 ├── main.go                     entry point: finds the workspace, wires packages together
 ├── install.sh                  build to $BIN_DIR as `skills`, then run link_claude_skills.sh
-├── link_claude_skills.sh       replace ~/.claude/skills with a symlink to the exposed dir
+├── link_claude_skills.sh       symlink ~/.claude/skills -> skills/ and ~/.claude/CLAUDE.md -> AGENTS.md
 ├── uninstall.sh                remove that binary
 └── internal/
     ├── ui/                     Bubble Tea TUI (model, update, view)

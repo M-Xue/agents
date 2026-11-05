@@ -138,6 +138,15 @@ without rebuilding the selector:
 sh skill-selector-app/link_claude_skills.sh
 ```
 
+The same script also links `~/.claude/CLAUDE.md` to this repo's `AGENTS.md`,
+so Claude Code and agents that read `AGENTS.md` share one set of global
+instructions. If `AGENTS.md` does not exist yet, an existing `~/.claude/CLAUDE.md`
+is moved there to become it; if neither exists, an empty `AGENTS.md` is
+created. If both exist, `~/.claude/CLAUDE.md` is moved to
+`~/.claude/CLAUDE.md-old` rather than deleted, and the script refuses to run
+if that backup already exists. A `~/.claude/CLAUDE.md` symlink that points
+somewhere else is replaced.
+
 When started inside a different checkout of this repo, the selector prefers
 that checkout over the compiled-in one, and `skills -root <path>`
 overrides both.
@@ -157,6 +166,7 @@ This removes the binary `install.sh` created. It honors the same `$BIN_DIR`
 override, so export it again here if you set it at install time. The symlinks
 in `skills/` are your selection, not part of the program, and are left in
 place; remove them with the selector itself or by hand. The
-`~/.claude/skills` link is left in place too, so Claude Code keeps seeing the
-skills in `skills/`; remove it and restore `~/.claude/skills-old` by hand if
-you want the previous layout back.
+`~/.claude/skills` and `~/.claude/CLAUDE.md` links are left in place too, so
+Claude Code keeps seeing the skills in `skills/` and the instructions in
+`AGENTS.md`; remove them and restore `~/.claude/skills-old` and
+`~/.claude/CLAUDE.md-old` by hand if you want the previous layout back.
